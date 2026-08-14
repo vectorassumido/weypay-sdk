@@ -5,18 +5,25 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
-- **Fase:** 2 **concluída** — `client.py` apagado, `initiate_payment` chama o SDK
-  diretamente, `estado` desconhecido no callback → 200 (não 400), `GatewayCallLog` novo
-  (auditoria em criação e webhook), `core/phone.py` limpo. **209/209 testes, `OK`**.
-- **Próximo passo:** Fase 3 — `docs/migration/03-bookwey-adopt.md`. Precisa primeiro de
-  `providers/eupago/` (mbway, split, pix, status, callbacks) e
-  `providers/ifthenpay/pinpay.py` já existe — só falta EuPago no SDK. Depois `bookwey-serverless`
-  adota o transporte. Pré-condição do próprio guião: `docs/OPEN-QUESTIONS.md` #1-3
-  já resolvidas na Fase 0b.
-- **Bloqueios abertos:** nenhum para começar os providers EuPago no SDK (não tocam nenhum
-  projeto consumidor). Reserva de número de teste real disponível (condições estritas — ver
-  `docs/OPEN-QUESTIONS.md` §"Número de teste em reserva"), mas nenhuma fase autónoma depende
-  dela hoje.
+- **Fase:** 3, **em curso** — SDK-side concluído (providers EuPago), `bookwey-serverless`
+  ainda por adotar.
+  - ✅ `providers/eupago/` completo: `mbway.py`, `split.py`, `pix.py`, `status.py` (103
+    testes no SDK, gates verdes, commit `baf76bb`). `providers/ifthenpay/pinpay.py` já
+    existia desde a Fase 0c. `callback.py` do EuPago **deliberadamente adiado para a Fase 4**
+    (ver Log) — não é consumido por nada até lá.
+  - ⏳ **Próximo passo**: `bookwey-serverless/booksys-be` adota o transporte (ver
+    `docs/migration/03-bookwey-adopt.md`). SDK já instalado no venv do bookwey (editable).
+    **Baseline confirmada**: `DJANGO_SETTINGS_MODULE=booksys_be.settings.development python
+    manage.py test` → **91 testes, `OK`** — guardar este número, é o que a suite tem de dar
+    depois das mudanças também. Depois: teste de tabela
+    payload-antigo-vs-novo (obrigatório antes de trocar `float`→`Money`), reescrever as 5
+    funções de `integrations/payments/utils.py` (`criar_pagamento_com_split`,
+    `criar_pagamento_europix`, `criar_pagamento_pinpay`, `verificar_pagamento`,
+    `verificar_pagamento_mbway`) para chamarem o SDK, campo aditivo `eupago_environment` em
+    `Merchant` (com fallback ao parsing do URL antigo — não destrutivo), `Environment.FAKE`
+    como default em `development.py`.
+- **Bloqueios abertos:** nenhum. `bookwey-serverless` continua sem nenhum ficheiro tocado
+  ainda (só o SDK instalado no venv, que não é um ficheiro do repo).
 - **Modo:** `/loop` auto-ritmado, sessão contínua.
 
 ## Incidentes reais (não evitados — corrigidos depois de acontecerem)
@@ -237,6 +244,33 @@ diretório persistido entre chamadas de Bash quando a chamada envolve git.
 - `docs/migration/02-boxwey-cleanup.md` atualizado com "✅ Executado".
 - Sem incidentes de segurança nesta fase — sweep de credenciais e do número de telefone
   limpo em ambos os repos antes do commit.
+
+### 2026-08-14 — Fase 3 (parcial): providers EuPago no SDK (commits `1c0d423`, `baf76bb`)
+- **`money.py`**: `to_gateway_number()` — exceção estreita e documentada a "nunca float"
+  (a EuPago exige número JSON, não string; `json` da biblioteca padrão não serializa
+  `Decimal`). Conversão só na fronteira de serialização, provada sem perdas por teste
+  parametrizado até ao limite documentado da EuPago (99 999€). `docs/SECURITY.md` regra 4
+  atualizada para deixar esta exceção explícita, não implícita.
+- **`providers/eupago/`**: `mbway.py` (sem split — `entity` não preenchido, não confirmado
+  nesta variante), `split.py` (`Beneficiary` dataclass, `externKey` redigido — corrige o bug
+  original de `print(payload)` a despejar chaves de beneficiário), `pix.py`
+  (`successUrl`/`failUrl`/`backUrl` aceites, confirmado em sandbox), `status.py` (path legado
+  `/clientes/rest_api/multibanco/info`, `retry=True` por ser leitura).
+- **Decisão de âmbito**: `providers/eupago/callback.py` **adiado para a Fase 4** — não é
+  consumido por nada em Fase 3 (o `bookwey` não tem hoje um handler de webhook EuPago real, só
+  o endpoint inseguro que a Fase 4 corrige), e escrevê-lo agora seria código não exercitado.
+  A lista original em `docs/migration/03-bookwey-adopt.md` incluía-o; ajustado.
+- 29 testes novos no SDK (103 no total), vários espelhando literalmente as respostas
+  observadas em sandbox na Fase 0b (`docs/observed/eupago_*.json`) em vez de payloads
+  inventados. `test_isolation.py` confirmado com 2 providers reais (antes só vacuamente
+  verdadeiro com 1).
+- **`bookwey-serverless` — preparação, nada tocado ainda**: SDK instalado em editable mode no
+  venv. **Baseline estabelecida**: `python manage.py test` → **91 testes, `OK`**. Próximo
+  passo real: o teste de tabela payload-antigo-vs-novo, depois a reescrita de
+  `integrations/payments/utils.py`.
+- Parei aqui deliberadamente — a reescrita de `utils.py` toca lógica de comissão e um modelo
+  de produção real (`Merchant`) num terceiro codebase ainda não tocado nesta sessão; prefiro
+  começá-la com orçamento fresco na próxima iteração, tal como fiz nas fronteiras 1→2 e 2→3.
 
 ## Regras de retoma
 

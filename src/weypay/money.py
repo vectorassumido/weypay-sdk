@@ -41,10 +41,22 @@ class Money:
             raise ValueError(f"moedas incompatíveis: {self.currency} vs {other.currency}")
 
     def to_gateway_string(self) -> str:
-        """Formato com separador '.', ex. '20.00' — o que todos os gateways documentados até
-        agora esperam (ifthenpay, EuPago). Se algum gateway precisar de vírgula, o provider
-        respetivo formata a partir de ``self.amount`` diretamente, não muda este método."""
+        """Formato com separador '.', ex. '20.00' — o que a maioria dos gateways documentados
+        até agora espera como STRING (ifthenpay). Se algum gateway precisar de vírgula, o
+        provider respetivo formata a partir de ``self.amount`` diretamente, não muda este
+        método."""
         return f"{self.amount:.2f}"
+
+    def to_gateway_number(self) -> float:
+        """Exceção estreita e deliberada a "nunca float" (docs/SECURITY.md regra 4): alguns
+        gateways (EuPago) exigem o montante como NÚMERO JSON, não string — e o módulo `json`
+        da biblioteca padrão não serializa ``Decimal`` nativamente. A conversão acontece só
+        aqui, na fronteira de serialização, nunca em aritmética — ``self.amount`` já está
+        quantizado ao cêntimo antes desta chamada, e um double IEEE 754 representa sem perdas
+        qualquer valor de 2 casas decimais até 15 dígitos significativos (bem acima dos limites
+        documentados dos gateways, ex. 99 999€ na EuPago — 7 dígitos). Nunca usar o resultado
+        para cálculos; só para colocar no payload."""
+        return float(self.amount)
 
     @classmethod
     def parse(cls, value: str, currency: str = "EUR") -> Money:

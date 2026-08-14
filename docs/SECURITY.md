@@ -33,6 +33,12 @@ que o comportamento observável não piora.
 4. **`Decimal` ponta-a-ponta.** `Money` formata a string exata que cada gateway espera (a
    ifthenpay exige separador `.`); acabam os `float(reservation_value)` do `bookwey` num
    caminho onde um erro de arredondamento binário é dinheiro real, não um detalhe estético.
+   **Exceção estreita e documentada** (Fase 3): `Money.to_gateway_number()` — a EuPago exige
+   o montante como número JSON, não string, e o `json` da biblioteca padrão não serializa
+   `Decimal`. A conversão para `float` acontece só na fronteira de serialização (nunca em
+   aritmética), a partir de um valor já quantizado ao cêntimo — sem perdas dentro dos limites
+   documentados de qualquer gateway (provado por teste, `test_money.py`). Isto não reabre a
+   regra: continua proibido fazer contas em `float` nalgum ponto do caminho.
 
 5. **Comparação em tempo constante** de toda chave/segredo de callback, sempre —
    `hmac.compare_digest` / `django.utils.crypto.constant_time_compare`. O `boxwey` já o faz

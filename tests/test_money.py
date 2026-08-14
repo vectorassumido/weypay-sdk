@@ -59,3 +59,15 @@ def test_no_binary_float_drift_across_the_table() -> None:
     for _ in range(3):
         total = total + Money(Decimal("33.33"))
     assert total.amount == Decimal("99.99")
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["0.01", "0.10", "0.15", "19.99", "100.00", "4.68", "33.33", "99999.99", "0.00"],
+)
+def test_to_gateway_number_is_lossless_within_documented_gateway_limits(raw: str) -> None:
+    """to_gateway_number() é uma exceção estreita a "nunca float" — só na serialização, nunca
+    em aritmética. Prova de que é sem perdas até ao limite documentado da EuPago (99 999€)."""
+    money = Money(Decimal(raw))
+    roundtrip = Decimal(str(money.to_gateway_number())).quantize(Decimal("0.01"))
+    assert roundtrip == money.amount

@@ -21,10 +21,19 @@ concluído (mais recente no topo), mais o estado corrente.
   consumidor antes de commitar.
 - **Bloqueios abertos:** nenhum nas fases concluídas. Itens deliberadamente adiados, todos
   documentados: `providers/eupago/callback.py` (Fase 4), `Environment.FAKE` default em
-  `bookwey`'s `development.py` (precisa de fixtures reais, quebraria testes existentes sem
-  elas), Fase 4 (segurança `bookwey`) e Fase 5 (SIBS) por inteiro.
-- **Modo:** interativo (utilizador presente). Ver `docs/REPORT.md` para o relatório completo
-  da execução autónoma 0a→3.
+  `bookwey`'s `development.py` (precisa de fixtures reais — já existem, ver abaixo — mas
+  `FakeResponseRegistry` só regista uma resposta por `(method, url)`, não dá para pré-carregar
+  vários desfechos do mesmo endpoint sem alargar o desenho; decisão a confirmar com o
+  utilizador), Fase 4 (segurança `bookwey`) e Fase 5 (SIBS) por inteiro, PINPAY/Apple Pay no
+  `bookwey` (utilizador precisa de pedir conta de teste à ifthenpay primeiro).
+- **2026-08-15 — utilizador pausou a sessão** depois de validar pagamentos reais em 3 dos 4
+  produtos (EuPago MB WAY/split, EuroPix, ifthenpay MB WAY — pago/recusado/expirado×2). Nada
+  ficou a meio: todos os gates verdes, tudo commitado. Ver "Adendo" em `docs/REPORT.md` para o
+  resumo completo desta sessão interativa. **Retomar aqui**: ou PINPAY quando houver conta de
+  teste, ou Fase 4/5 quando o utilizador quiser avançar — nenhuma das duas é acionável sem
+  input dele (credenciais/decisão de desenho), por isso não há próximo passo autónomo óbvio.
+- **Modo:** interativo (utilizador presente quando ativo). Ver `docs/REPORT.md` para o
+  relatório completo da execução autónoma 0a→3 e o adendo da validação real 0a→3+.
 - **2026-08-14 — pagamento sandbox real concluído com sucesso em `bookwey-serverless`**,
   incluindo confirmação como "paga" no backoffice EuPago. Pelo caminho, dois problemas reais
   encontrados e corrigidos (não hipotéticos — só apareceram com dinheiro/estado real):

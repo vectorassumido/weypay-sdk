@@ -6,6 +6,70 @@ payload-antigo-vs-novo (abaixo) a provar que nenhum valor monetário muda por ef
 **pontuais e guardadas por teste** (a troca de tipo numérico, a remoção de `print()`), mas
 **nunca** uma mudança de comportamento não coberta por um teste que a demonstre.
 
+## ✅ Executado em 2026-08-14 — **91/91 testes, `OK`** (idêntico à baseline)
+
+Passos 1-3 concluídos como planeado. **Passo 4 adiado** — ver abaixo.
+
+- **Teste de tabela payload-antigo-vs-novo** corrido primeiro, como pré-condição: para
+  `0.10, 0.15, 19.99, 100.005, 33.33×3`, o payload JSON gerado por `float(Decimal(v))` (código
+  antigo) e por `Money(v).to_gateway_number()` (novo) é **byte-a-byte idêntico** em todos os
+  casos que podem ocorrer de facto neste codebase. O único caso "DIFERENTE" (`100.005`) é
+  teórico — todo `DecimalField` de dinheiro no `bookwey` já é `decimal_places=2`, e
+  `calculate_commission_amount()` já quantiza a cada passo, por isso um valor de 3 casas
+  decimais nunca chega de facto a `criar_pagamento_*()`. Onde acontece (só no teste), `Money`
+  arredonda corretamente (`100.01`) — mais seguro que o `float()` antigo, que teria enviado
+  `100.005` sem arredondar.
+- **Encontrado ao desenhar o rewrite, correção adicional ao SDK**: os providers EuPago
+  resolviam sempre para o host canónico fixo (`clientes.eupago.pt`/`sandbox.eupago.pt`), mas
+  o `bookwey` guarda o URL exato por-merchant em `Merchant.eupago_api_url` — dados reais de
+  produção que podem não bater certo com o canónico. Adicionado `base_url: str | None` opcional
+  a `mbway.py`/`split.py`/`pix.py`/`status.py` (commit `396faad`), que quando dado substitui a
+  resolução por completo. `bookwey` passa sempre `base_url=f"{merchant.eupago_api_url}/api"` —
+  preserva exatamente o host que cada merchant já tinha configurado.
+- **5 funções de `integrations/payments/utils.py` reescritas**: `criar_pagamento_com_split`
+  (delega para `eupago_split`/`eupago_mbway` conforme `salon_key != owner_key`, tal como
+  antes), `criar_pagamento_europix`, `criar_pagamento_pinpay`, `verificar_pagamento`,
+  `verificar_pagamento_mbway`. `calculate_commission_amount`, `create_staff_payment`,
+  `pay_pagamento`, `send_merchant_monthly_summary_email` **inalteradas**. Mensagens de erro
+  originais preservadas byte-a-byte (`raise Exception("Erro ao iniciar o pagamento.") from exc`
+  etc.) — `GatewayRejected`/`GatewayUnavailable` do SDK são apanhadas e reconvertidas, para
+  `booking.py`'s `except Exception as e: raise APIException(str(e))` continuar a devolver
+  exatamente a mesma mensagem de hoje.
+- **`Merchant.eupago_environment`**: campo aditivo (`core/models.py`), migration de schema
+  (`0002`) + migration de **dados** separada (`0003`, `RunPython`) que faz backfill a partir
+  do parsing de `eupago_api_url` — nenhum merchant muda de comportamento, só torna explícito o
+  que já estava implícito no texto do URL. Adicionado também ao fieldset do admin
+  (`backoffice/admin.py`).
+- **Encontrado por varredura sistemática (grep) antes de tocar em qualquer ficheiro** — hábito
+  já estabelecido nas Fases 1/2: `api/tests/test_booking_client_phone_sync.py` tinha 2 testes
+  a espiar `integrations.payments.utils.requests.post` diretamente. Adaptados (não apagados —
+  testam lógica de negócio real do `bookwey`, o bug de telefone obsoleto do cliente) para
+  `@patch("weypay.http.requests.request")`, confirmados a passar isoladamente antes da suite
+  completa.
+- **Resultado**: `python manage.py test` → **91 testes, `OK`**, idêntico à baseline.
+  `makemigrations --check --dry-run` limpo. (Sem `ruff`/`mypy` — este checkout do `bookwey`
+  não tem essas ferramentas configuradas, ao contrário do `boxwey`; verificação de sintaxe via
+  `py_compile` feita como substituto mínimo.)
+
+### Passo 4 — `Environment.FAKE` como default em `development.py` — **adiado, não implementado**
+
+Motivo, descoberto ao tentar implementar (não decidido antecipadamente): forçar `FAKE` sem
+`fake_registry`/fixtures reais faria `Environment.FAKE` levantar `ConfigurationError` em
+**qualquer** tentativa de pagamento local — incluindo dentro dos testes que correm com
+`DJANGO_SETTINGS_MODULE=booksys_be.settings.development` (não há um settings module de teste
+separado no `bookwey`). Isso quebraria `test_booking_client_phone_sync.py` e qualquer teste
+futuro que mockeie `weypay.http.requests.request`: em modo FAKE o pedido nunca chega a esse
+ponto, o mock fica sem efeito e a chamada falha sempre com `ConfigurationError` em vez de usar
+a resposta mockada.
+
+Resolver isto como deve ser exige fixtures reais gravadas (o mesmo trabalho já identificado
+como pendente em `docs/LOCAL-TESTING.md` para o `bookwey`) — construir isso agora seria
+scope creep sobre a Fase 3, com o risco adicional de quebrar testes existentes. Decisão:
+**mesma categoria de adiamento que `providers/eupago/callback.py`** — registado aqui e em
+`docs/PROGRESS.md`, não escondido. Environment continua a ser resolvido a partir do merchant
+(`_eupago_environment()`), exatamente como descrito nos passos 1-3 acima; só a
+flag global "força tudo para FAKE" fica por fazer.
+
 ## Pré-condições
 
 - `docs/OPEN-QUESTIONS.md` #1-3 (endpoint legado de status, `entity` na resposta sem split,

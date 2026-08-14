@@ -5,26 +5,17 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
-- **Fase:** 3, **em curso** — SDK-side concluído (providers EuPago), `bookwey-serverless`
-  ainda por adotar.
-  - ✅ `providers/eupago/` completo: `mbway.py`, `split.py`, `pix.py`, `status.py` (103
-    testes no SDK, gates verdes, commit `baf76bb`). `providers/ifthenpay/pinpay.py` já
-    existia desde a Fase 0c. `callback.py` do EuPago **deliberadamente adiado para a Fase 4**
-    (ver Log) — não é consumido por nada até lá.
-  - ⏳ **Próximo passo**: `bookwey-serverless/booksys-be` adota o transporte (ver
-    `docs/migration/03-bookwey-adopt.md`). SDK já instalado no venv do bookwey (editable).
-    **Baseline confirmada**: `DJANGO_SETTINGS_MODULE=booksys_be.settings.development python
-    manage.py test` → **91 testes, `OK`** — guardar este número, é o que a suite tem de dar
-    depois das mudanças também. Depois: teste de tabela
-    payload-antigo-vs-novo (obrigatório antes de trocar `float`→`Money`), reescrever as 5
-    funções de `integrations/payments/utils.py` (`criar_pagamento_com_split`,
-    `criar_pagamento_europix`, `criar_pagamento_pinpay`, `verificar_pagamento`,
-    `verificar_pagamento_mbway`) para chamarem o SDK, campo aditivo `eupago_environment` em
-    `Merchant` (com fallback ao parsing do URL antigo — não destrutivo), `Environment.FAKE`
-    como default em `development.py`.
-- **Bloqueios abertos:** nenhum. `bookwey-serverless` continua sem nenhum ficheiro tocado
-  ainda (só o SDK instalado no venv, que não é um ficheiro do repo).
-- **Modo:** `/loop` auto-ritmado, sessão contínua.
+- **Fase:** 3 **concluída** (passos 1-3; passo 4 deliberadamente adiado — ver Log).
+  `bookwey-serverless` adota o transporte SDK para EuPago/PINPAY. **91/91 testes, `OK`**,
+  idêntico à baseline.
+- **Âmbito autónomo terminado.** Fases 0a→3 concluídas. Fases 4 e 5 exigem revisão presencial
+  e configuração nos backoffices dos gateways — fora do âmbito autónomo por desenho. Ver
+  `docs/REPORT.md` para o relatório completo.
+- **Bloqueios abertos:** nenhum nas fases concluídas. Itens deliberadamente adiados, todos
+  documentados: `providers/eupago/callback.py` (Fase 4), `Environment.FAKE` default em
+  `bookwey`'s `development.py` (precisa de fixtures reais, quebraria testes existentes sem
+  elas), Fase 4 (segurança `bookwey`) e Fase 5 (SIBS) por inteiro.
+- **Modo:** `/loop` parado no fim desta iteração — âmbito autónomo cumprido.
 
 ## Incidentes reais (não evitados — corrigidos depois de acontecerem)
 
@@ -271,6 +262,53 @@ diretório persistido entre chamadas de Bash quando a chamada envolve git.
 - Parei aqui deliberadamente — a reescrita de `utils.py` toca lógica de comissão e um modelo
   de produção real (`Merchant`) num terceiro codebase ainda não tocado nesta sessão; prefiro
   começá-la com orçamento fresco na próxima iteração, tal como fiz nas fronteiras 1→2 e 2→3.
+
+### 2026-08-14 — Fase 3 fecha: `bookwey` adota o transporte (commit `396faad` no SDK; `bookwey` por commitar)
+- **SDK, commit `396faad`**: `base_url: str | None` opcional acrescentado a
+  `mbway.py`/`split.py`/`pix.py`/`status.py` — encontrado ao desenhar o rewrite: os providers
+  resolviam sempre para o host canónico fixo, mas o `bookwey` guarda o URL exato por-merchant
+  em dados reais de produção que podem divergir. 4 testes novos (107 no total).
+- **Teste de tabela payload-antigo-vs-novo** corrido como script de verificação (não um teste
+  permanente — compara código que ia ser apagado) antes de tocar em `utils.py`: para
+  `0.10, 0.15, 19.99, 100.005, 33.33×3`, byte-a-byte idêntico em todos os casos que podem
+  ocorrer de facto (todo `DecimalField` de dinheiro no `bookwey` já é 2dp,
+  `calculate_commission_amount` já quantiza a cada passo). O único "diferente" (`100.005`) é
+  teórico, e nesse caso `Money` é mais seguro (arredonda) que o `float()` antigo.
+  Output completo em `docs/migration/03-bookwey-adopt.md`.
+- **`bookwey`, ficheiros tocados** (nenhum commitado, regra 1):
+  - `integrations/payments/utils.py`: as 5 funções (`criar_pagamento_com_split`,
+    `criar_pagamento_europix`, `criar_pagamento_pinpay`, `verificar_pagamento`,
+    `verificar_pagamento_mbway`) chamam o SDK; `calculate_commission_amount`,
+    `create_staff_payment`, `pay_pagamento`, `send_merchant_monthly_summary_email`
+    inalteradas. Mensagens de erro preservadas byte-a-byte
+    (`GatewayRejected`/`GatewayUnavailable` reconvertidas para `Exception(...)` com o mesmo
+    texto de sempre, para `booking.py` continuar a devolver a mesma `APIException`).
+  - `core/models.py` + `backoffice/admin.py`: `Merchant.eupago_environment` aditivo.
+  - `core/migrations/0002_...` (schema) + `0003_backfill_eupago_environment.py` (dados,
+    `RunPython`, preenche a partir do parsing de `eupago_api_url`).
+  - **Encontrado por varredura sistemática antes de tocar em qualquer ficheiro** (hábito das
+    Fases 1/2, aplicado logo à partida desta vez): `api/tests/test_booking_client_phone_sync.py`
+    tinha 2 testes a espiar `integrations.payments.utils.requests.post`. Adaptados (não
+    apagados — testam um bug real de negócio, não implementação) para
+    `@patch("weypay.http.requests.request")`.
+- **Passo 4 do guião (`Environment.FAKE` default em `development.py`) — adiado, não
+  implementado.** Motivo descoberto ao tentar: sem `fake_registry`/fixtures reais, FAKE
+  levantaria `ConfigurationError` em qualquer tentativa de pagamento local, incluindo dentro
+  dos próprios testes (o `bookwey` não tem settings module de teste separado — os testes
+  correm sob `development.py`). Isso quebraria `test_booking_client_phone_sync.py` e qualquer
+  teste futuro com `weypay.http.requests.request` mockado, já que em FAKE o pedido nunca
+  chega a esse ponto. Construir fixtures reais agora seria scope creep (é o mesmo trabalho já
+  pendente em `docs/LOCAL-TESTING.md`) — mesma categoria de adiamento que
+  `providers/eupago/callback.py`.
+- **`bookwey` não tem `ruff`/`mypy` configurados** neste checkout (sem `requirements-dev.txt`,
+  ao contrário do `boxwey`) — `py_compile` usado como verificação de sintaxe mínima em
+  substituição, já que instalar ferramentas novas seria fora do âmbito pedido.
+- **Resultado**: `python manage.py test` → **91/91, `OK`**, idêntico à baseline.
+  `makemigrations --check --dry-run` limpo.
+- `docs/migration/03-bookwey-adopt.md` atualizado com "✅ Executado" e a nota do adiamento.
+- Sem incidentes de segurança nesta fase — sweep de credenciais e do número de telefone
+  limpo em ambos os repos antes do commit.
+- **Fase 3 concluída. Âmbito autónomo (Fases 0a→3) cumprido — ver `docs/REPORT.md`.**
 
 ## Regras de retoma
 

@@ -5,10 +5,13 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
-- **Fase:** 0a — repositório e documentação
-- **Próximo passo:** escrever `docs/providers/ifthenpay-mbway.md`
-- **Bloqueios abertos:** nenhum
-- **Modo:** trabalho interativo (não `/loop`) nesta sessão
+- **Fase:** 0a **concluída**. Próxima: 0b (verificar contra a sandbox tudo o que está ⚠️ em
+  `docs/OPEN-QUESTIONS.md`) — ver `docs/migration/00-setup.md`.
+- **Próximo passo:** criar `venv`, instalar `.[dev,sibs]`, escrever os scripts de
+  `tests/manual/` para as questões #1-7 de `docs/OPEN-QUESTIONS.md` e correr contra a
+  sandbox EuPago / conta de teste ifthenpay com as credenciais já fornecidas.
+- **Bloqueios abertos:** nenhum.
+- **Modo:** trabalho interativo (não `/loop`) nesta sessão.
 
 ## Incidentes evitados
 
@@ -38,6 +41,27 @@ diretório persistido entre chamadas de Bash quando a chamada envolve git.
 - Criada em `/home/chrisdo/.claude/skills/weypay-phase/SKILL.md`: protocolo de arranque por
   iteração, gates, as 9 restrições invioláveis, marcação ✅/⚠️, e critério de fecho (`REPORT.md`
   + parar antes da Fase 4).
+
+### 2026-08-14 — Fase 0a, passos 3-9: documentação completa
+- `docs/providers/`: `ifthenpay-mbway.md`, `ifthenpay-pinpay.md`, `ifthenpay-callbacks.md`,
+  `eupago-mbway.md`, `eupago-pix.md`, `eupago-status.md`, `eupago-webhooks.md`,
+  `sibs-spg.md`, `sibs-marketplace.md` — 9 ficheiros, cada afirmação marcada ✅/⚠️.
+  Discrepâncias reais encontradas e registadas (não corrigidas ainda): endpoint EuPago legado
+  `/clientes/rest_api/multibanco/info` vs o documentado `/multibanco/info`; `successUrl`/
+  `failUrl`/`backUrl` enviados no PIX sem constarem da spec; três hosts SIBS incompatíveis
+  entre fontes oficiais; vocabulário de estado do callback ifthenpay por confirmar.
+- `docs/ARCHITECTURE.md`, `ENVIRONMENTS.md`, `SECURITY.md` (9 regras), `OPEN-QUESTIONS.md`
+  (14 itens, priorizados por resolúvel-na-0b vs precisa-do-utilizador vs bloqueado-por-SIBS).
+- `docs/LOCAL-TESTING.md`: 3 níveis por projeto, comandos exatos a partir dos README/CLAUDE.md
+  reais (não inventados) de `bookwey-serverless` e `boxwey-serverless`.
+- `docs/migration/00-setup.md` a `05-sibs.md`: 6 guiões, cada um com pré-condições, passos,
+  testes a acrescentar, comando de verificação e reversão. `04` e `05` documentados mas
+  explicitamente fora do âmbito autónomo.
+- `docs/PLAN.md`: cópia do plano aprovado pelo utilizador.
+- Commits: `084aee3` (providers), `47b76b6` (transversais), `fb76f54` (LOCAL-TESTING).
+- Quase-incidente registado acima (cwd persistido) — sem dano, hábito corrigido.
+- Nada instalado além do que já estava no sistema (Python 3.12.12, git 2.34.1, ambos
+  pré-existentes). Nenhum `venv` criado ainda — fica para o primeiro passo da Fase 0b.
 
 ## Regras de retoma
 

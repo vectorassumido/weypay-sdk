@@ -28,14 +28,31 @@ loop, não só a esta.
 
 | # | Questão | O que se sabe agora | O que falta |
 |---|---|---|---|
-| 2 | A resposta de `/api/v1.02/mbway/create` (sem split) traz `entity`? | Testado só com número inválido (seguro): `HTTP 400 CUSTOMERPHONE_INVALID`, forma de erro confirmada. Ver `docs/observed/eupago_mbway_create_invalid_phone.json`. | Uma criação com sucesso, que só é segura com um número de telefone de teste **fornecido pelo utilizador**. |
+| 2 | A resposta de `/api/v1.02/mbway/create` (sem split) traz `entity`? | Testado só com número inválido (seguro): `HTTP 400 CUSTOMERPHONE_INVALID`, forma de erro confirmada. Ver `docs/observed/eupago_mbway_create_invalid_phone.json`. | Uma criação com sucesso — ver "Número de teste em reserva" abaixo. |
 
-## Precisam de um número de telefone de teste do utilizador (não resolúveis pelo agente sozinho)
+## Número de teste em reserva — usar só se genuinamente bloqueante
 
-| # | Questão | Gateway/doc | Bloqueia |
+**2026-08-14**: o utilizador forneceu um número de telefone pessoal real (guardado só em
+`.env.manual`, nunca neste ficheiro nem em nenhum ficheiro rastreado) como reserva de
+emergência para desbloquear #5/#15 abaixo, com condições estritas:
+
+- O utilizador **não pode reagir a nenhum push** neste número até regressar (fim de semana) —
+  qualquer push enviado fica por confirmar até expirar.
+- Usar **só se uma fase autónoma ficar genuinamente bloqueada** sem isto — nunca por
+  curiosidade nem para "completar" uma questão que já tem um comportamento seguro assumido.
+- **No máximo uma chamada**, nunca repetida.
+
+**Avaliação, 2026-08-14**: nenhuma das Fases 1/2/3 (âmbito autónomo atual) depende de facto de
+#5 ou #15 — ambas são confirmatórias, não bloqueantes (o SDK já trunca `descricao`
+defensivamente independentemente do que a ifthenpay fizer; o código que lê `entity` não é
+tocado antes da Fase 3, e mesmo aí o comportamento atual pode ser preservado sem confirmação).
+**Decisão: não usar o número agora.** Só reconsiderar se uma fase autónoma ficar
+verdadeiramente parada sem esta informação — registar aqui e em `PROGRESS.md` antes de usar.
+
+| # | Questão | Gateway/doc | Bloqueia de facto? |
 |---|---|---|---|
-| 5 | `descricao` > 50 chars na ifthenpay MB WAY: trunca, ignora ou rejeita? | `ifthenpay-mbway.md` | Fase 2 — testável só com `SetPedidoJson`, que dispara push real |
-| 15 | A resposta de `split-payments/mbway` traz mesmo `entity`+`reference`+`amount`? | `eupago-mbway.md` | Fase 3 |
+| 5 | `descricao` > 50 chars na ifthenpay MB WAY: trunca, ignora ou rejeita? | `ifthenpay-mbway.md` | Não — o SDK já trunca sempre, independentemente da resposta |
+| 15 | A resposta de `split-payments/mbway` traz mesmo `entity`+`reference`+`amount`? | `eupago-mbway.md` | Não — Fase 3 pode preservar o código atual sem confirmar |
 
 ## Precisam de acesso ao backoffice do utilizador
 

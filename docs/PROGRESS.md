@@ -5,18 +5,19 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
-- **Fase:** 0c **concluída** — core (Money, errors, types, redaction, http com Environment e
-  FAKE) + provider ifthenpay (mbway, pinpay, callback) completos e testados. 65 testes, gates
-  verdes. `v0.1.0.dev0` ainda não taggeada — considerar fazê-lo no início da Fase 1.
-- **Próximo passo:** Fase 1 — `boxwey-serverless` adota o SDK, zero-alteração-de-comportamento.
-  Ver `docs/migration/01-boxwey-adopt.md`: instalar o SDK em editable mode
-  (`pip install -e /home/chrisdo/projects/weypay-sdk`), reescrever
-  `integrations/ifthenpay/client.py` como shim fino sobre `weypay.providers.ifthenpay.mbway`,
-  `views.py` a usar `verify_and_parse`. **Critério único de aceitação**: `python manage.py
-  test` verde sem editar um único teste existente. Ficheiros tocados ficam por commitar
-  (regra 1 — nunca commitar em `boxwey-serverless`).
-- **Bloqueios abertos:** nenhum para a Fase 1. Ficam em aberto (não bloqueiam) as questões
-  #2/#5/#15 de `OPEN-QUESTIONS.md` — dependem de um número de telefone de teste do utilizador.
+- **Fase:** 1 **concluída** — `boxwey-serverless` adota o SDK para o webhook ifthenpay.
+  **209/209 testes, `OK`, zero testes editados** (idêntico à baseline). Âmbito ajustado por
+  conflito real (ver Log): `client.py` não foi tocado, fica para a Fase 2, que já planeava
+  apagá-lo por completo.
+- **Próximo passo:** Fase 2 — `docs/migration/02-boxwey-cleanup.md`. Apagar `client.py` (e
+  `ClientTests`, cuja cobertura já existe no SDK), `initiate_payment` chama o SDK diretamente,
+  corrigir resposta a `estado` desconhecido (200 em vez de 400), tratamento de timeout
+  (`PENDING` em vez de `FAILED`), `GatewayCallLog` novo, resolver `core/phone.py`
+  (`pt_national_digits` morto). **Esta fase muda comportamento deliberadamente** — cada
+  mudança precisa de teste novo que a prove, ao contrário da Fase 1.
+- **Bloqueios abertos:** nenhum para a Fase 2. Reserva de número de teste real disponível
+  (condições estritas — ver `docs/OPEN-QUESTIONS.md` §"Número de teste em reserva"), mas
+  nenhuma fase autónoma depende dela hoje.
 - **Modo:** `/loop` auto-ritmado, sessão contínua.
 
 ## Incidentes reais (não evitados — corrigidos depois de acontecerem)
@@ -170,6 +171,38 @@ diretório persistido entre chamadas de Bash quando a chamada envolve git.
 - Nada instalado além do já registado na Fase 0b (mesmo venv).
 - Dois incidentes cosméticos, sem impacto real, registados acima (fragmento de credencial
   residual em PROGRESS.md; crase interpretada pelo shell numa mensagem de commit).
+
+### 2026-08-14 — Fase 1: `boxwey` adota o SDK (commits 7645f9b, ce535f8 no SDK; `views.py` por commitar no `boxwey`)
+- **Baseline estabelecida primeiro**: `python manage.py test` no `boxwey` limpo →
+  **209 testes, `OK`**. Guardada antes de tocar em qualquer ficheiro.
+- SDK instalado em editable mode no venv do `boxwey`
+  (`pip install -e /home/chrisdo/projects/weypay-sdk`) — nada global.
+- **Conflito real encontrado, não deduzido**: `integrations/ifthenpay/tests.py::ClientTests`
+  faz `@patch("integrations.ifthenpay.client.requests.post")`. Um shim de `client.py` a
+  delegar para o SDK deixaria de importar `requests`, quebrando o alvo do mock em 3 testes —
+  não por mudança de comportamento, por um motivo estrutural. Segui a regra do próprio plano
+  ("se não for possível sem editar um teste, o passo está mal desenhado — parar e reportar"):
+  **não toquei em `client.py`**. Fase 2 já planeava apagá-lo por completo — a decisão foi
+  adiar para lá em vez de criar um shim intermédio que seria apagado a seguir.
+- **SDK ganhou 3 funções granulares** (`verify_key`/`verify_amount`/`parse_status`, commit
+  `7645f9b`) — descoberto que `views.py` devolve códigos HTTP diferentes por tipo de falha
+  (403/400/400), que um único `WebhookVerificationError` genérico não distingue sem parsing
+  de mensagem. `verify_and_parse` continua a existir, agora compondo estas três. 9 testes
+  novos (74 no total no SDK).
+- **`views.py` reescrito** para usar essas 3 funções, preservando exatamente os mesmos códigos
+  HTTP e mensagens de log — único ficheiro tocado em `boxwey-serverless`, não commitado.
+- **Encontrado e corrigido**: `mypy` do `boxwey` falhava com `import-untyped` para `weypay` —
+  faltava o marcador `py.typed` (PEP 561). Corrigido no SDK (commit `ce535f8`); não precisou
+  de reinstalar o editable install.
+- **Resultado**: `python manage.py test` → **209 testes, `OK`**, idêntico à baseline, **zero
+  testes editados**. `ruff`/`mypy` do `boxwey` inteiro também verdes.
+- `docs/migration/01-boxwey-adopt.md` e `02-boxwey-cleanup.md` atualizados para refletir o
+  âmbito real (ver "✅ Executado" no `01`).
+- **Número de teste real recebido do utilizador**, em conversa, com condições estritas (não
+  reagir até regressar; usar só se genuinamente bloqueante; no máximo uma chamada). Guardado
+  só em `.env.manual` (nunca em ficheiro rastreado). Avaliação feita: **não usado** — nenhuma
+  fase autónoma depende dele hoje. Ver `docs/OPEN-QUESTIONS.md` §"Número de teste em reserva",
+  `docs/SECURITY.md` regra 10, e a skill `weypay-phase` restrição 10 (atualizadas as três).
 
 ## Regras de retoma
 

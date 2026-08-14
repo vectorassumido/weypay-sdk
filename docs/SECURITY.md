@@ -73,6 +73,12 @@ que o comportamento observável não piora.
     só o que é seguro (respostas de erro com número deliberadamente inválido, ou métodos que não
     envolvem push — PIX, Multibanco, consulta de estado).
 
+    **2026-08-14**: existe um número de teste real, fornecido pelo utilizador, guardado só em
+    `.env.manual` (nunca em ficheiro rastreado). Condições estritas do próprio utilizador: não
+    pode reagir a nenhum push até regressar, usar só se uma fase ficar genuinamente bloqueada
+    sem isso, no máximo uma chamada, nunca repetida. Ver `docs/OPEN-QUESTIONS.md` §"Número de
+    teste em reserva" para a avaliação de quando (não) usar.
+
 ## O que fica deliberadamente de fora
 
 Registry de plugins, cliente async, pydantic, ABCs de provider (um `Protocol` de tipagem

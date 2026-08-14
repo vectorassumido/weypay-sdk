@@ -5,10 +5,20 @@ teste novo que a prova.
 
 ## Pré-condições
 
-- `01-boxwey-adopt.md` concluído e verde.
+- `01-boxwey-adopt.md` concluído e verde — ✅ feito em 2026-08-14, 209/209 testes.
 - `docs/OPEN-QUESTIONS.md` #5 e #6 (ifthenpay: `descricao` > 50 chars, vocabulário de
   `[ESTADO]`) resolvidas na Fase 0b — ou explicitamente adiadas com nota do porquê, se a Fase
-  0b não conseguiu confirmá-las.
+  0b não conseguiu confirmá-las. **Ambas ficaram adiadas** — #5 não bloqueia (o SDK já trunca
+  sempre, independentemente da resposta real da ifthenpay); #6 depende do backoffice do
+  utilizador. Ver `docs/OPEN-QUESTIONS.md` §"Número de teste em reserva".
+
+**Nota herdada de `01`**: o `client.py` do `boxwey` não foi tocado na Fase 1 (conflito real
+com `ClientTests`, que faz `@patch("integrations.ifthenpay.client.requests.post")`) — fica
+todo para aqui. Quando `client.py` for apagado, **`ClientTests` (3 testes) também é apagada**
+— não editada, apagada por completo, porque o seu sujeito (a chamada `requests.post` dentro de
+`client.py`) deixa de existir. A cobertura equivalente já existe em
+`weypay-sdk/tests/providers/test_ifthenpay_mbway.py` desde a Fase 0c — isto é uma remoção
+justificada de teste redundante, não uma perda de cobertura.
 
 ## Ficheiros tocados
 

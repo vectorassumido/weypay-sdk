@@ -247,6 +247,46 @@ def test_fake_environment_redacts_secrets_too() -> None:
     assert "should-not-leak" not in str(call.response)
 
 
+# --- redação de segredos embutidos no URL (não só no corpo) ------------------------------
+
+
+@responses.activate
+def test_redacts_secret_embedded_in_url_path() -> None:
+    """A GATEWAY_KEY da PINPAY vai no path do URL, não no corpo — secret_keys não a apanha."""
+    gateway_key = "GTW-SECRET-123"
+    url_with_secret = f"https://api.example.pt/gateway/pinpay/{gateway_key}"
+    responses.add(responses.POST, url_with_secret, json={"RedirectUrl": "https://x"}, status=200)
+
+    _, call = perform_request(
+        method="POST",
+        url=url_with_secret,
+        provider="ifthenpay.pinpay",
+        operation="create_payment",
+        environment=Environment.SANDBOX,
+        redact_url_values=frozenset({gateway_key}),
+    )
+    assert gateway_key not in call.url
+    assert call.url == "https://api.example.pt/gateway/pinpay/***"
+
+
+@responses.activate
+def test_real_request_still_uses_the_unredacted_url() -> None:
+    """A redação é só no GatewayCall — o pedido real tem de ir para o URL verdadeiro."""
+    gateway_key = "GTW-SECRET-123"
+    url_with_secret = f"https://api.example.pt/gateway/pinpay/{gateway_key}"
+    responses.add(responses.POST, url_with_secret, json={}, status=200)
+
+    perform_request(
+        method="POST",
+        url=url_with_secret,
+        provider="x",
+        operation="y",
+        environment=Environment.SANDBOX,
+        redact_url_values=frozenset({gateway_key}),
+    )
+    assert responses.calls[0].request.url == url_with_secret
+
+
 def test_money_sanity_import_does_not_regress() -> None:
     # smoke test só para garantir que os dois módulos coexistem sem import cycle
     from weypay.money import Money

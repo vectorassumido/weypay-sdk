@@ -94,6 +94,7 @@ def perform_request(
     headers: dict[str, str] | None = None,
     timeout: tuple[float, float] = DEFAULT_TIMEOUT,
     secret_keys: frozenset[str] = frozenset(),
+    redact_url_values: frozenset[str] = frozenset(),
     retry: bool = False,
     fake_registry: FakeResponseRegistry | None = None,
 ) -> tuple[dict[str, Any] | None, GatewayCall]:
@@ -107,9 +108,15 @@ def perform_request(
     ``retry=True`` só deve ser passado por operações de leitura (consulta de estado) —
     2 tentativas, backoff exponencial com jitter, só em erro de ligação ou 5xx. Nunca usar em
     operações de escrita (criação de pagamento).
+
+    ``redact_url_values``: alguns providers (a PINPAY da ifthenpay) embutem o segredo no
+    *path* do URL, não no corpo — ``secret_keys`` não o apanha, porque só olha para dicts. Os
+    valores aqui listados são substituídos por ``"***"`` no ``GatewayCall.url`` (nunca no URL
+    real usado para o pedido HTTP).
     """
     correlation_id = str(uuid.uuid4())
     redacted_request = redact(json_body or {}, secret_keys)
+    display_url = _redact_url(url, redact_url_values)
 
     if environment is Environment.FAKE:
         if fake_registry is None:
@@ -121,7 +128,7 @@ def perform_request(
             correlation_id=correlation_id,
             provider=provider,
             operation=operation,
-            url=url,
+            url=display_url,
             http_status=status_code,
             duration_ms=0,
             request=redacted_request,
@@ -170,7 +177,7 @@ def perform_request(
             correlation_id=correlation_id,
             provider=provider,
             operation=operation,
-            url=url,
+            url=display_url,
             http_status=response.status_code,
             duration_ms=duration_ms,
             request=redacted_request,
@@ -186,3 +193,11 @@ def perform_request(
 def _sleep_backoff(attempt: int) -> None:
     delay = _BACKOFF_BASE_SECONDS * (2 ** (attempt - 1))
     time.sleep(delay + random.uniform(0, delay * 0.25))  # noqa: S311 — jitter, não criptografia
+
+
+def _redact_url(url: str, secret_values: frozenset[str]) -> str:
+    redacted = url
+    for value in secret_values:
+        if value:
+            redacted = redacted.replace(value, "***")
+    return redacted

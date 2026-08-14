@@ -49,6 +49,18 @@ concluído (mais recente no topo), mais o estado corrente.
   sandbox real: `Payment.reference="320787"` (EuPago), `client_reference="<id local>"`,
   `check_payment_status(client_reference)` resolve sem 404. Ver
   `docs/providers/eupago-pix.md`, `docs/OPEN-QUESTIONS.md` #19.
+- **2026-08-15 — ifthenpay MB WAY validado no `boxwey-serverless` com um pagamento real de
+  €0,01** (ifthenpay não tem sandbox — número do utilizador, autorizado e aceite por ele no
+  telemóvel; ver `docs/SECURITY.md` regra 10). `initiate_payment()` funcionou sem alterações.
+  Pelo caminho, implementada `get_order_status()` (`EstadoPedidosJSON`) — endpoint de
+  reconciliação que nunca tinha sido portado em nenhum dos dois projetos. Três correções só
+  descobertas por chamada real (a documentação estava errada nos três pontos): precisa de GET
+  com querystring (não POST/JSON); o nome do método é `EstadoPedidosJSON`, todo maiúsculas
+  (`EstadoPedidosJson` dá 500, o próprio erro revelou a grafia certa); a resposta tem dois
+  `Estado` (o de topo é do pedido HTTP, o que importa é `EstadoPedidos[0].Estado`). Exigiu
+  adicionar suporte a `params=` (query string) a `perform_request()` — única chamada do SDK
+  que não vai no corpo. Confirmado `PaymentStatus.PAID` para o pagamento real. 4 testes novos
+  (111/111 SDK verde). Ver `docs/providers/ifthenpay-mbway.md`, `docs/OPEN-QUESTIONS.md` #20.
 
 ## Incidentes reais (não evitados — corrigidos depois de acontecerem)
 

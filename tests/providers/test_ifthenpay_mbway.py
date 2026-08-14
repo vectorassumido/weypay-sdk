@@ -108,6 +108,75 @@ def test_description_is_truncated_to_50_chars() -> None:
     assert len(sent_body["descricao"]) == mbway.DESCRIPTION_MAX_LENGTH
 
 
+STATUS_URL = "https://mbway.ifthenpay.com/ifthenpaymbw.asmx/EstadoPedidosJSON"
+
+
+@responses.activate
+def test_get_order_status_paid_matches_observed_shape() -> None:
+    """Payload espelha uma consulta real (2026-08-14, pagamento de €0,01 aceite pelo
+    utilizador) — não inventado. Ver docs/providers/ifthenpay-mbway.md."""
+    responses.add(
+        responses.GET,
+        STATUS_URL,
+        json={
+            "EstadoPedidos": [
+                {
+                    "IdPedido": "hDEXBPMUJ0drGAI7Fbqe",
+                    "Estado": "000",
+                    "DataHoraPedidoRegistado": "14-08-2026 23:56:19",
+                    "DataHoraPedidoAtualizado": "14-08-2026 23:56:56",
+                    "MsgDescricao": "Operação financeira concluída com sucesso",
+                }
+            ],
+            "Estado": "000",
+            "DataHora": "15-08-2026 00:00:11",
+            "MsgDescricao": "Operação concluída com sucesso.",
+        },
+        status=200,
+    )
+
+    status, data = mbway.get_order_status(mbway_key="KEY-1", payment_id="hDEXBPMUJ0drGAI7Fbqe")
+
+    assert status == PaymentStatus.PAID
+    orders = data["EstadoPedidos"]
+    assert isinstance(orders, list)
+    assert orders[0]["Estado"] == "000"
+
+    sent = responses.calls[0].request
+    assert sent.method == "GET"
+    assert sent.url is not None
+    assert "MbWayKey=KEY-1" in sent.url
+    assert "idspagamento=hDEXBPMUJ0drGAI7Fbqe" in sent.url
+
+
+@responses.activate
+def test_get_order_status_uses_the_nested_estado_not_the_top_level_one() -> None:
+    """A resposta tem dois `Estado`: o de topo é do pedido HTTP (sempre "000" se a consulta
+    correu), o que importa é o de dentro de EstadoPedidos[0] — um pagamento ainda pendente
+    tem topo "000" mas o pagamento em si não está pago."""
+    responses.add(
+        responses.GET,
+        STATUS_URL,
+        json={
+            "EstadoPedidos": [{"IdPedido": "id-1", "Estado": "100", "MsgDescricao": "pendente"}],
+            "Estado": "000",
+            "MsgDescricao": "Operação concluída com sucesso.",
+        },
+        status=200,
+    )
+
+    status, _ = mbway.get_order_status(mbway_key="KEY-1", payment_id="id-1")
+
+    assert status == PaymentStatus.UNKNOWN
+
+
+@responses.activate
+def test_get_order_status_http_error_raises_gateway_rejected() -> None:
+    responses.add(responses.GET, STATUS_URL, json={"Message": "error"}, status=500)
+    with pytest.raises(GatewayRejected):
+        mbway.get_order_status(mbway_key="K", payment_id="id-1")
+
+
 def test_sandbox_without_acknowledgement_raises() -> None:
     """ifthenpay não tem sandbox real — ver docs/ENVIRONMENTS.md."""
     from weypay.errors import ConfigurationError

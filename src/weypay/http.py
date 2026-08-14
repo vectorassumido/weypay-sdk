@@ -91,6 +91,7 @@ def perform_request(
     operation: str,
     environment: Environment,
     json_body: dict[str, Any] | None = None,
+    params: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
     timeout: tuple[float, float] = DEFAULT_TIMEOUT,
     secret_keys: frozenset[str] = frozenset(),
@@ -113,9 +114,13 @@ def perform_request(
     *path* do URL, não no corpo — ``secret_keys`` não o apanha, porque só olha para dicts. Os
     valores aqui listados são substituídos por ``"***"`` no ``GatewayCall.url`` (nunca no URL
     real usado para o pedido HTTP).
+
+    ``params``: query string (ex.: ifthenpay ``EstadoPedidosJSON``, que exige GET — a única
+    chamada do SDK que não vai no corpo). Redigido em conjunto com ``json_body`` no registo de
+    auditoria — os dois nunca coexistem na prática, por isso fundir é seguro.
     """
     correlation_id = str(uuid.uuid4())
-    redacted_request = redact(json_body or {}, secret_keys)
+    redacted_request = redact({**(json_body or {}), **(params or {})}, secret_keys)
     display_url = _redact_url(url, redact_url_values)
 
     if environment is Environment.FAKE:
@@ -145,7 +150,7 @@ def perform_request(
         start = time.monotonic()
         try:
             response = requests.request(
-                method, url, json=json_body, headers=headers, timeout=timeout
+                method, url, json=json_body, params=params, headers=headers, timeout=timeout
             )
         except requests.exceptions.Timeout as exc:
             last_exc = exc

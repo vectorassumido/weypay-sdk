@@ -14,6 +14,8 @@ from ...types import Environment, PaymentResult, PaymentStatus
 
 CHANNEL = "03"
 DESCRIPTION_MAX_LENGTH = 50
+# ✅ "MbWayKey" confirmado a mesma grafia em SetPedidoJson e EstadoPedidosJSON (chamada real,
+# 2026-08-14) — a documentação sugeria "mbWayKey" (minúsculo) para o segundo, não confirmado.
 _SECRET_KEYS = frozenset({"MbWayKey"})
 
 # ifthenpay não tem sandbox real — ver docs/ENVIRONMENTS.md. Environment.SANDBOX aqui exige
@@ -96,3 +98,64 @@ def request_payment(
         raw_status=raw_status,
         call=call,
     )
+
+
+# Vocabulário de EstadoPedidosJSON — mesmos códigos numéricos de SYNC_STATUS_*, mas aqui
+# "000" significa "transação completada com sucesso" (estado FINAL), enquanto em
+# SetPedidoJson "000" significa só "pedido enviado ao cliente" (aceitação do pedido). O mesmo
+# código é ambíguo consoante o endpoint — não interpretar um sem saber de qual resposta veio.
+STATUS_COMPLETED = "000"
+
+
+def get_order_status(
+    *,
+    mbway_key: str,
+    payment_id: str,
+    environment: Environment = Environment.PRODUCTION,
+    acknowledge_no_sandbox: bool = False,
+) -> tuple[PaymentStatus, dict[str, object]]:
+    """``EstadoPedidosJSON`` — consulta de leitura, não contacta o telefone do cliente (ver
+    docs/SECURITY.md regra 10, que só se aplica a `request_payment`). ``payment_id`` é o
+    ``IdPedido`` devolvido por `request_payment`.
+
+    ✅ Confirmado com uma consulta real (2026-08-14, pagamento €0,01 aceite pelo utilizador):
+    o endpoint exige **GET com querystring** (POST com corpo JSON devolve 500 sem detalhe);
+    **método é `EstadoPedidosJSON`**, todo maiúsculas em "JSON" — `EstadoPedidosJson` devolve
+    500 com "Invalid method name" (o próprio erro revelou a grafia certa); o campo da chave é
+    `MbWayKey` (igual a `SetPedidoJson`, não `mbWayKey` como a documentação sugeria). A
+    resposta tem **dois níveis de `Estado`**: o de topo é do pedido HTTP em si (sempre "000"
+    se a consulta correu bem, mesmo que o pagamento não esteja pago); o que importa é
+    ``EstadoPedidos[0]["Estado"]``, o estado do pagamento propriamente dito."""
+    base_url = resolve_base_url(
+        environment, ENDPOINTS, acknowledge_no_sandbox=acknowledge_no_sandbox
+    )
+    url = f"{base_url}/EstadoPedidosJSON"
+
+    params = {
+        "MbWayKey": mbway_key,
+        "canal": CHANNEL,
+        "idspagamento": payment_id,
+    }
+
+    data, call = perform_request(
+        method="GET",
+        url=url,
+        provider="ifthenpay.mbway",
+        operation="get_order_status",
+        environment=environment,
+        params=params,
+        headers={"accept": "application/json"},
+        secret_keys=_SECRET_KEYS,
+        retry=True,
+    )
+
+    if data is None or call.http_status != 200:
+        raise GatewayRejected(
+            call.http_status or 0, data if data is not None else (call.response or ""), call=call
+        )
+
+    orders = data.get("EstadoPedidos")
+    order_status = orders[0] if isinstance(orders, list) and orders else {}
+    raw_status = str(order_status.get("Estado", "") or "")
+    status = PaymentStatus.PAID if raw_status == STATUS_COMPLETED else PaymentStatus.UNKNOWN
+    return status, data

@@ -67,11 +67,48 @@ numéricos provavelmente não se aplicam a ele. `"101"` nem sequer consta da tab
 oficial acima. Não corrigir sem confirmar o vocabulário real do callback (Fase 0b) — a
 correção segura e incondicional é: estado desconhecido no callback nunca devolve 4xx.
 
-## (e) Consulta de estado — `EstadoPedidosJson`
+## (e) Consulta de estado — `EstadoPedidosJSON`, implementada no SDK (2026-08-14/15)
 
-✅ Existe, GET ou POST, devolve o estado de um ou mais pedidos pela `referencia`. **Nunca
-portado** em nenhum dos dois projetos — é o endpoint de reconciliação que falta para um job
-de "confirmar pagamentos pendentes há muito tempo" sem depender só do callback.
+✅ **Confirmado com uma chamada real** (pagamento MB WAY de €0,01, feito com o número do
+utilizador e aceite por ele para validar isto de ponta a ponta — ver `docs/SECURITY.md` regra
+10, autorização explícita, não adivinhada). A documentação pública tinha três pontos errados,
+só descobertos ao chamar de verdade:
+
+1. **Método**: só GET com querystring funciona. POST com corpo JSON devolve `HTTP 500` sem
+   detalhe (`{"Message":"There was an error processing the request.",...}`) — indistinguível
+   de qualquer outro erro sem tentar as alternativas.
+2. **Nome do método**: `EstadoPedidosJSON` (todo maiúsculas em "JSON"). `EstadoPedidosJson`
+   (como a documentação e o nome-irmão `SetPedidoJson` sugeririam) devolve `HTTP 500` com
+   `"Invalid method name 'EstadoPedidosJson', ... The method name 'EstadoPedidosJSON' with the
+   same name but different casing was found."` — o próprio erro revelou a grafia certa.
+3. **Nome do campo da chave**: `MbWayKey` (igual a `SetPedidoJson`), não `mbWayKey` como uma
+   leitura inicial da documentação sugeria.
+
+**Resposta real observada** (`docs/observed/ifthenpay_estado_pedidos_paid.json`):
+```json
+{
+  "EstadoPedidos": [
+    {"IdPedido": "hDEXBPMUJ0drGAI7Fbqe", "Estado": "000",
+     "DataHoraPedidoRegistado": "14-08-2026 23:56:19",
+     "DataHoraPedidoAtualizado": "14-08-2026 23:56:56",
+     "MsgDescricao": "Operação financeira concluída com sucesso"}
+  ],
+  "Estado": "000", "DataHora": "15-08-2026 00:00:11",
+  "MsgDescricao": "Operação concluída com sucesso."
+}
+```
+
+⚠️→✅ **Dois níveis de `Estado`, confirmado não serem a mesma coisa**: o de topo é do pedido
+HTTP em si — "a consulta correu bem", sempre "000" nesse caso, **mesmo que o pagamento em si
+não esteja pago**. O que importa é `EstadoPedidos[0].Estado` — só esse reflete o estado real
+do pagamento. Implementado em `weypay/providers/ifthenpay/mbway.py::get_order_status()`
+(`params=`, não `json_body=` — exigiu adicionar suporte a query string a `perform_request`,
+ver `weypay/http.py`).
+
+Implementada — deixa de estar "nunca portada". É o endpoint de reconciliação que faltava para
+um job de "confirmar pagamentos pendentes há muito tempo" sem depender só do callback, tanto
+no `boxwey` (MB WAY direto) como no `bookwey` (via PINPAY, se aplicável ao mesmo mecanismo —
+não verificado para PINPAY especificamente).
 
 ## (f) Estado atual do código
 

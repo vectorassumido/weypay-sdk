@@ -80,6 +80,31 @@ def test_successful_request_returns_data_and_call() -> None:
 
 
 @responses.activate
+def test_get_with_query_params_is_sent_and_redacted() -> None:
+    """ifthenpay EstadoPedidosJSON exige GET com querystring, não corpo JSON — a única
+    chamada do SDK que usa params. Redação tem de cobrir isto tal como json_body."""
+    responses.add(responses.GET, URL, json={"Estado": "000"}, status=200)
+
+    data, call = perform_request(
+        method="GET",
+        url=URL,
+        provider="ifthenpay",
+        operation="mbway.status",
+        environment=Environment.SANDBOX,
+        params={"MbWayKey": "secret", "idspagamento": "id-1"},
+        secret_keys=frozenset({"MbWayKey"}),
+    )
+
+    assert data == {"Estado": "000"}
+    assert call.request["MbWayKey"] == "***"
+    assert call.request["idspagamento"] == "id-1"
+    sent = responses.calls[0].request
+    assert sent.method == "GET"
+    assert sent.url is not None
+    assert "MbWayKey=secret" in sent.url
+
+
+@responses.activate
 def test_always_passes_explicit_timeout() -> None:
     responses.add(responses.POST, URL, json={}, status=200)
     _, call = perform_request(

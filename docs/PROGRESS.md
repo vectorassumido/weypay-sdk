@@ -20,8 +20,8 @@ Na Fase 0a, ao escrever o guião de teste local, copiei os valores reais das cre
 utilizador tinha colado na conversa (chave EuPago de sandbox, chaves de beneficiário,
 `ITP_MBWAY_KEY`) diretamente para `docs/LOCAL-TESTING.md`, como "exemplo". Isso violou a regra
 do próprio repositório ("O repo do SDK nunca contém uma credencial") e ficou commitado no
-commit `fb76f54`. Um resto truncado (`demo-f2be-...`) também entrou em `docs/ENVIRONMENTS.md`
-como exemplo de padrão.
+commit `fb76f54`. Um fragmento truncado da mesma chave também entrou em `docs/ENVIRONMENTS.md`
+como exemplo de padrão (corrigido para um placeholder totalmente sintético).
 
 **Descoberto e corrigido na Fase 0b**, ao fazer uma varredura (`grep`) antes de commitar os
 scripts de observação — hábito que devia ter sido aplicado logo na Fase 0a. Correção: os dois

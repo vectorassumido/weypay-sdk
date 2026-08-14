@@ -29,6 +29,11 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+# PEP 561 — anuncia aos consumidores (ex.: o mypy do boxwey/bookwey) que este pacote tem
+# type hints inline, para deixarem de o tratar como "import-untyped".
+weypay = ["py.typed"]
+
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]

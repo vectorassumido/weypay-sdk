@@ -73,6 +73,7 @@ verdadeiramente parada sem esta informação — registar aqui e em `PROGRESS.md
 | 4 | `chave_api` do Webhook 1.0 é mesmo o mecanismo de verificação, ou só está documentado como "a chave usada para criar a referência"? | `eupago-webhooks.md` | Configurar callback de sandbox para um túnel, pagar, observar | Fase 4 (fora do âmbito autónomo, mas a resposta informa-a) |
 | 6 | Que valores textuais de `[ESTADO]` chegam ao callback ifthenpay além de `PAGO`? Existe callback de recusa/cancelamento? | `ifthenpay-callbacks.md` | **Webhook Tester** oficial no backoffice ifthenpay | Fase 2 (mapear `STATUS_REFUNDED`/`STATUS_DECLINED` corretamente) |
 | 7 | O `bookwey`/PINPAY já tem algum callback registado no backoffice? Com que nomes de parâmetro? | `ifthenpay-pinpay.md` | Ler o backoffice ifthenpay da conta `bookwey` | Fase 4 |
+| 23 | Existe um endpoint de consulta de estado para PINPAY (equivalente ao `EstadoPedidosJSON` do MB WAY, confirmado hoje só por chamada real, não pela documentação)? A documentação oficial não lista nenhum — mas a documentação também estava errada/incompleta sobre `EstadoPedidosJSON`. | `ifthenpay-pinpay.md` | Pedir conta de teste PINPAY à ifthenpay (`ifthenpay_gateway_key`/`ifthenpay_apple_key` reais — utilizador já decidiu adiar isto), depois testar chamadas candidatas | Fase 4 — é exatamente o mecanismo que fecharia a falha de segurança do `check_payment_status` para `pinpay` (item 7 acima) |
 
 ## Não resolúveis sem o utilizador (túnel público ou registo em backoffice)
 

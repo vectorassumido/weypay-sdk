@@ -43,6 +43,18 @@ melhoria de UX a considerar na Fase 3, não uma correção de bug.
 Não há estado síncrono nesta chamada — só se sabe se o checkout foi criado. O estado do
 pagamento chega **apenas pelo callback** (ver `ifthenpay-callbacks.md`).
 
+✅ **Confirmado (2026-08-15, releitura da documentação oficial, motivada pela descoberta do
+mesmo dia de que `EstadoPedidosJson`/`EstadoPedidosJSON` do MB WAY não estava documentado
+corretamente): a página oficial do PINPAY não lista nenhum endpoint de consulta de estado.**
+Só o endpoint de criação está documentado — nada equivalente ao `EstadoPedidosJSON` do MB
+WAY. Isto **não foi verificado por chamada real** (ao contrário do MB WAY hoje) — falta uma
+conta de teste com `GATEWAY_KEY`/`ifthenpay_apple_key` real (ver
+`docs/OPEN-QUESTIONS.md`, item pendente de credenciais de teste PINPAY). Fica ⚠️ a
+possibilidade de existir um endpoint não documentado nesta página mas real (como aconteceu
+com o MB WAY), a confirmar quando houver conta de teste PINPAY disponível — **não assumir que
+não existe só por não estar na documentação**, foi exatamente esse erro que o teste real do
+MB WAY corrigiu.
+
 ## (e) Callback
 
 ✅ Formato oficial: `key=[ANTI_PHISHING_KEY]&id=[ID]&amount=[AMOUNT]&payment_datetime=[PAYMENT_DATETIME]&payment_method=[PAYMENT_METHOD]`

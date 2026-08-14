@@ -215,3 +215,82 @@ que aconteceu, estão em `docs/PROGRESS.md`.
    pede uma decisão tua antes deste repo alguma vez ganhar um remote público.
 4. Nenhuma ação sua é necessária para nada mais — tudo o resto está em estado consistente e
    testado.
+
+---
+
+## Adendo — validação interativa com pagamentos reais (2026-08-14/15)
+
+**Contexto**: o relatório acima cobre a execução autónoma (Fases 0a→3). Esta secção cobre o
+trabalho **interativo**, feito depois do regresso do utilizador, que passou a autorizar
+commits diretos em `boxwey-serverless`/`bookwey-serverless` na branch `weypay-sdk-migration`
+(decisão registada em `docs/PROGRESS.md`, 2026-08-14). Ao contrário da fase autónoma, esta
+sessão executou **pagamentos reais** (com montantes mínimos — €0,01 a €15,00 — e sempre com
+autorização explícita do utilizador para cada chamada que contactasse o telefone dele),
+porque era a única forma de confirmar comportamento que a documentação oficial não descrevia
+ou descrevia mal. Todos os testes seguiram a mesma regra de segurança já registada:
+**nunca disparar uma criação MB WAY com um número não fornecido explicitamente para esse
+fim.**
+
+### O que foi validado, gateway a gateway
+
+| Gateway | Produto | Projeto | Desfecho testado | Resultado |
+|---|---|---|---|---|
+| EuPago | MB WAY (split) | `bookwey` | Criação + confirmação manual no backoffice sandbox + consulta de estado | ✅ `estado_referencia == "paga"` |
+| EuPago | EuroPix | `bookwey` | Criação + confirmação + consulta de estado | ✅ idem, após corrigir bug (ver abaixo) |
+| ifthenpay | MB WAY | `boxwey` | Aceite pelo utilizador | ✅ `Estado == "000"` |
+| ifthenpay | MB WAY | `boxwey` | Recusado deliberadamente | ✅ `Estado == "020"` |
+| ifthenpay | MB WAY | `boxwey` | Deixado expirar (~4 min, consulta imediata) | ✅ `Estado == "123"` |
+| ifthenpay | MB WAY | `boxwey` | Deixado expirar (~5 min completos, consulta com margem) | ✅ `Estado == "101"` |
+| ifthenpay | PINPAY/Apple Pay | `bookwey` | — | ⏸️ Adiado — utilizador precisa de pedir conta de teste à ifthenpay primeiro |
+
+### Três bugs reais encontrados e corrigidos (nenhum hipotético — todos só apareceram ao pagar a sério)
+
+1. **`weypay/providers/eupago/status.py` tinha `/api` a mais no host canónico.** Copiado por
+   engano dos providers de criação (que precisam do `/api`); o path legado de consulta de
+   estado nunca o levou no código original. Toda consulta de estado devolvia 404 — e o
+   próprio teste do provider tinha o mesmo engano embutido no URL esperado, por isso passava
+   sem detetar nada. Corrigido; fechou também a última incerteza real do projeto
+   (`estado_referencia == "paga"` confirmado, não só assumido).
+2. **`bookwey`'s EuroPix guardava o id local em `Payment.reference`, não a referência real da
+   EuPago.** `criar_pagamento_europix` precisa de um id *antes* de chamar a EuPago (para
+   `successUrl`), mas nunca substituía esse id pela referência real devolvida na resposta —
+   bug presente também no código pré-migração, nunca detetado por falta de teste. Corrigido
+   com um campo novo, `Payment.client_reference`, para o id local; `Payment.reference` passa a
+   ser sempre a referência real (como já era no MB WAY/split).
+3. **A documentação oficial da ifthenpay para `EstadoPedidosJSON` estava errada em três
+   pontos** — método (exige GET, não POST), grafia (`EstadoPedidosJSON`, não
+   `EstadoPedidosJson` — o próprio erro 500 revelou isto), e estrutura da resposta (dois
+   níveis de `Estado`, só o de dentro de `EstadoPedidos[0]` importa). Este endpoint nunca
+   tinha sido portado por nenhum dos dois projetos — implementado agora, com o vocabulário de
+   estados descoberto por observação real: `"000"` pago, `"020"` recusado,
+   `"101"`/`"123"` expirado (dois códigos diferentes consoante o timing da consulta — ver
+   `docs/providers/ifthenpay-mbway.md` para a hipótese sobre porquê).
+
+### Commits desta sessão
+
+- `weypay-sdk`: 31 commits locais no total (branch `main`), sem remote. Gates verdes — 114
+  testes (`pytest`), `ruff`, `mypy --strict`.
+- `boxwey-serverless`: 25 commits na branch `weypay-sdk-migration` (inclui as Fases 1-2 já
+  commitadas pelo utilizador ao regressar, mais o trabalho desta sessão). `main` intocado.
+- `bookwey-serverless`: 19 commits na branch `weypay-sdk-migration` (idem, Fase 3 + os dois
+  fixes de EuroPix/status). `main` intocado.
+- Nenhum `git push` em lado nenhum. Nenhuma escrita em GCP/Cloudflare.
+
+### O que ficou por fazer, e porquê
+
+- **PINPAY/Apple Pay no `bookwey`**: precisa de uma conta de teste real da ifthenpay
+  (`ifthenpay_apple_key` — o merchant local só tem `gateway_key`). Decisão do utilizador:
+  pedir a conta primeiro, retomar depois.
+- **Endpoint de consulta de estado para PINPAY**: a documentação oficial não lista nenhum
+  (ao contrário do MB WAY, cuja documentação também estava incompleta mas o endpoint existe
+  na mesma) — não verificado por chamada real, precisa da mesma conta de teste acima. Ver
+  `docs/OPEN-QUESTIONS.md` #23.
+- **`Environment.FAKE` como default em `bookwey`'s `development.py`**: continua adiado. Havia
+  agora fixtures reais suficientes para o fazer (`docs/observed/*.json` cobre EuPago
+  mbway/split/status/pix e ifthenpay mbway/status, incluindo os 4 desfechos de estado), mas
+  `FakeResponseRegistry` só regista uma resposta por `(method, url)` — não distingue pedidos
+  ao mesmo endpoint por corpo/query — por isso não dá para pré-carregar "pago" vs "recusado"
+  vs "expirado" para o mesmo endpoint sem alargar o design do registo. Isso é uma decisão de
+  desenho do SDK, não uma tarefa mecânica — fica para quando puderes confirmar a abordagem.
+- **Fase 4 (segurança `bookwey`) e Fase 5 (SIBS)**: inalteradas, continuam fora do âmbito até
+  decidires avançar — exigem configuração em backoffices externos.

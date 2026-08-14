@@ -5,11 +5,17 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
-- **Fase:** 0b **concluída** (dentro do que é seguro fazer sozinho — ver regra de segurança
-  nova abaixo). Próxima: 0c (core + ifthenpay) — ver `docs/migration/00-setup.md`.
-- **Próximo passo:** `src/weypay/money.py`, `errors.py`, `types.py`, `redaction.py`, depois
-  `http.py` com `Environment` e o transporte `FAKE` a ler `docs/observed/`.
-- **Bloqueios abertos:** nenhum para a Fase 0c. Ficam em aberto (não bloqueiam) as questões
+- **Fase:** 0c **concluída** — core (Money, errors, types, redaction, http com Environment e
+  FAKE) + provider ifthenpay (mbway, pinpay, callback) completos e testados. 65 testes, gates
+  verdes. `v0.1.0.dev0` ainda não taggeada — considerar fazê-lo no início da Fase 1.
+- **Próximo passo:** Fase 1 — `boxwey-serverless` adota o SDK, zero-alteração-de-comportamento.
+  Ver `docs/migration/01-boxwey-adopt.md`: instalar o SDK em editable mode
+  (`pip install -e /home/chrisdo/projects/weypay-sdk`), reescrever
+  `integrations/ifthenpay/client.py` como shim fino sobre `weypay.providers.ifthenpay.mbway`,
+  `views.py` a usar `verify_and_parse`. **Critério único de aceitação**: `python manage.py
+  test` verde sem editar um único teste existente. Ficheiros tocados ficam por commitar
+  (regra 1 — nunca commitar em `boxwey-serverless`).
+- **Bloqueios abertos:** nenhum para a Fase 1. Ficam em aberto (não bloqueiam) as questões
   #2/#5/#15 de `OPEN-QUESTIONS.md` — dependem de um número de telefone de teste do utilizador.
 - **Modo:** `/loop` auto-ritmado, sessão contínua.
 
@@ -43,6 +49,19 @@ despercebido no relatório final.
 **Hábito corrigido, daqui em diante**: antes de qualquer commit que toque `docs/`, correr
 `grep` pelos valores conhecidos de credenciais (ver lista em `.env.manual`, nunca copiada para
 aqui) sobre a árvore staged, não só confiar em nunca os ter escrito.
+
+### 2026-08-14 — crase na mensagem de commit interpretada pelo shell
+Usei `` `responses` `` (Markdown, para destacar o nome de uma dependência) dentro de uma
+mensagem de commit passada com `-m "..."`. O bash interpretou as crases como substituição de
+comando (`responses` como comando inexistente), imprimiu `responses: command not found` no
+stderr, e a palavra desapareceu do corpo do commit (`6a44613`): "sem Django, com . O
+docstring..." em vez de "sem Django, com `responses`. O docstring...". Sem impacto em código,
+segredos ou significado enganador — só uma palavra em falta numa frase. Não fiz `git commit
+--amend` para corrigir, porque a regra de segurança geral é nunca reescrever commits sem
+pedido explícito, mesmo por um motivo cosmético e mesmo num repo local sem remote.
+**Hábito corrigido**: nunca usar crase nem `$()`/back-tick em mensagens de commit passadas
+inline com `-m`; se precisar de destacar código na mensagem, usar aspas simples ou escrever a
+mensagem para um ficheiro e usar `git commit -F`.
 
 ## Incidentes evitados
 
@@ -124,6 +143,33 @@ diretório persistido entre chamadas de Bash quando a chamada envolve git.
   — `ruff format` estava a tentar reformatar blocos de código dentro de `.md`, `extend-exclude
   = ["*.md"]` adicionado). `pytest` sem testes ainda (esperado — chegam na Fase 0c).
 - Commit: ver `git log` — mensagem "Fase 0b: observação real contra a sandbox EuPago...".
+
+### 2026-08-14 — Fase 0c: core + provider ifthenpay completos (commits 5549857, e09383c, a7ba17d, 6a44613)
+- **Core** (`5549857`): `money.py` (`Money`, rejeita `float`, quantize ROUND_HALF_UP,
+  `to_gateway_string()`/`parse()`), `errors.py` (6 exceções), `types.py` (`PaymentStatus`,
+  `Environment`, `GatewayCall`, `PaymentResult`, `WebhookEvent`), `redaction.py`. 17 testes.
+- **Transporte** (`e09383c`, corrigido em `a7ba17d`): `http.py` — `perform_request()` nunca
+  levanta por status code (o provider decide); `ConnectionError`→`GatewayUnavailable`,
+  timeout→`PaymentIndeterminate` (nunca o inverso); `retry=True` só leitura, 2 tentativas,
+  backoff+jitter, só ligação/5xx; `resolve_base_url()`/`GatewayEndpoints` com
+  `acknowledge_no_sandbox`; `FakeResponseRegistry`/`Environment.FAKE` nunca abre socket
+  (testado com monkeypatch). Correção **a7ba17d**: `redact_url_values` — encontrada ao
+  desenhar o PINPAY, cujo segredo vai no path do URL, que `secret_keys` (só dicts) não apanhava.
+- **Provider ifthenpay** (`6a44613`): `mbway.py` (porto fiel do client.py do boxwey — status
+  sempre `PENDING` numa criação aceite, nunca interpreta `Estado` síncrono como confirmação),
+  `pinpay.py` (valida `id` numérico ≤15 chars, `description` ≤200, `GATEWAY_KEY` redigida do
+  URL), `callback.py` (`extract_reference()`/`verify_and_parse()` em duas fases porque a
+  chave é por-tenant; `CallbackMapping` explícito; estado desconhecido → `UNKNOWN` sem
+  levantar — correção da Fase 2, aplicada já no SDK, documentada como divergência intencional
+  face ao HTTP 400 do código atual).
+- 24 testes portados de `boxwey/api/integrations/ifthenpay/tests.py`, com nota explícita do
+  que NÃO foi portado (efeitos de app — email, anular bilhetes, state machine) e porquê.
+- `tests/test_isolation.py`: prova que providers nunca se importam entre si (hoje vacuamente
+  verdadeiro, só há um provider).
+- **65 testes no total, gates verdes** (`ruff`, `mypy --strict`, `pytest`).
+- Nada instalado além do já registado na Fase 0b (mesmo venv).
+- Dois incidentes cosméticos, sem impacto real, registados acima (fragmento de credencial
+  residual em PROGRESS.md; crase interpretada pelo shell numa mensagem de commit).
 
 ## Regras de retoma
 

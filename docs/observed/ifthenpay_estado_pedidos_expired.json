@@ -1,0 +1,22 @@
+{
+  "_meta": {
+    "date": "2026-08-15",
+    "context": "Pagamento MB WAY real de €0,01 no boxwey-serverless (tenant local 'demo', conta de teste ifthenpay ITP_MBWAY_KEY), enviado para o número do utilizador — desta vez deixado expirar deliberadamente, sem aceitar nem recusar (a app MB WAY do utilizador mostrou uma janela de ~4 minutos para autorizar).",
+    "call": "GET https://mbway.ifthenpay.com/ifthenpaymbw.asmx/EstadoPedidosJSON?MbWayKey=<redigido>&canal=03&idspagamento=UChc9w7WiVl5JINp480t"
+  },
+  "http_status": 200,
+  "response_body": {
+    "EstadoPedidos": [
+      {
+        "IdPedido": "UChc9w7WiVl5JINp480t",
+        "Estado": "123",
+        "DataHoraPedidoRegistado": "15-08-2026 00:09:53",
+        "DataHoraPedidoAtualizado": "15-08-2026 00:09:53",
+        "MsgDescricao": "Operação financeira não encontrada"
+      }
+    ],
+    "Estado": "000",
+    "DataHora": "15-08-2026 00:14:07",
+    "MsgDescricao": "Operação concluída com sucesso."
+  }
+}

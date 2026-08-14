@@ -117,9 +117,27 @@ caminho de recusa: `EstadoPedidos[0].Estado == "020"`, `MsgDescricao: "Operaçã
 cancelada pelo utilizador"` — bate certo com a tabela síncrona documentada (`020` = "Financial
 transaction cancelled by the user"), agora confirmado também para `EstadoPedidosJSON`, não só
 para `SetPedidoJson`. `get_order_status()` mapeia `"020"` para `PaymentStatus.DECLINED`. Os
-restantes códigos da tabela (`048`, `100`, `104`, `111`, `113`, `122`, `123`, `125`) continuam
+restantes códigos da tabela (`048`, `100`, `104`, `111`, `113`, `122`, `125`) continuam
 ⚠️ não observados neste endpoint especificamente — ficam `UNKNOWN` até serem confirmados, não
 `DECLINED` por dedução. Ver `docs/observed/ifthenpay_estado_pedidos_declined.json`.
+
+### Expiração confirmada deixando a janela passar (2026-08-15)
+
+✅ Terceiro pagamento de €0,01, desta vez deixado expirar deliberadamente — a app MB WAY do
+utilizador mostrou uma janela de **~4 minutos** para autorizar (o "5 minutos" documentado é
+aproximado). Consultado depois de expirar: `EstadoPedidos[0].Estado == "123"`, `MsgDescricao:
+"Operação financeira não encontrada"`. **Não existe um código dedicado a "expirado"** — a
+tabela documenta `123` como "Financial transaction not found", e é isso que a ifthenpay
+devolve depois da janela passar: a transação deixa de existir para consulta, tal como se o
+`IdPedido` nunca tivesse sido válido. `get_order_status()` mapeia `"123"` para
+`PaymentStatus.EXPIRED`.
+
+⚠️ Ambiguidade residual, não eliminável só com esta observação: o mesmo `"123"` podia em
+teoria também aparecer para um `IdPedido` inválido/inexistente (nunca criado). Como
+`get_order_status()` só deve ser chamada com um `IdPedido` devolvido por `request_payment()`
+— nunca inventado — interpretar `"123"` como expiração é a leitura correta neste contrato de
+uso, mas fica registado para quem vier a reutilizar a função fora dele. Ver
+`docs/observed/ifthenpay_estado_pedidos_expired.json`.
 
 ## (f) Estado atual do código
 

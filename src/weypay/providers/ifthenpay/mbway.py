@@ -108,9 +108,18 @@ STATUS_COMPLETED = "000"
 # ✅ confirmado com uma recusa real (2026-08-15): "020" devolvido por EstadoPedidos[0].Estado
 # quando o utilizador recusa o push no telemóvel, MsgDescricao "Operação financeira cancelada
 # pelo utilizador" — bate certo com a tabela síncrona documentada. Os restantes códigos dessa
-# tabela (048, 100, 104, 111, 113, 122, 123, 125) ainda não foram observados especificamente
-# aqui — mapeiam para UNKNOWN até serem confirmados, não para DECLINED por dedução.
+# tabela (048, 100, 104, 111, 113, 122, 125) ainda não foram observados especificamente aqui —
+# mapeiam para UNKNOWN até serem confirmados, não para DECLINED por dedução.
 STATUS_DECLINED_BY_USER = "020"
+# ✅ confirmado deixando a janela de pagamento expirar sem responder (2026-08-15, ~4 min —
+# a app MB WAY do utilizador mostrou esse limite): "123", MsgDescricao "Operação financeira
+# não encontrada". A tabela documenta "123" como "Financial transaction not found", não
+# "expired" — não há código dedicado a expiração. ⚠️ Risco de ambiguidade não eliminado: o
+# mesmo "123" poderia teoricamente também surgir para um IdPedido inexistente/inválido; como
+# get_order_status só é chamada com um IdPedido devolvido por request_payment (nunca
+# inventado), interpretar "123" como expirado é a leitura correta neste uso, mas fica
+# documentado para quem reutilizar o código fora desse contrato.
+STATUS_EXPIRED_OR_NOT_FOUND = "123"
 
 
 def get_order_status(
@@ -134,8 +143,11 @@ def get_order_status(
     ``EstadoPedidos[0]["Estado"]``, o estado do pagamento propriamente dito.
 
     ✅ "020" (recusa pelo utilizador) confirmado com uma recusa real (2026-08-15) e mapeado
-    para ``PaymentStatus.DECLINED``. Os restantes códigos da tabela síncrona ainda não foram
-    observados neste endpoint especificamente — ficam ``UNKNOWN`` até o serem."""
+    para ``PaymentStatus.DECLINED``. ✅ "123" (janela de pagamento expirada sem resposta,
+    confirmado deixando expirar deliberadamente) mapeado para ``PaymentStatus.EXPIRED`` — não
+    há código dedicado a "expirado", a ifthenpay devolve "transação não encontrada". Os
+    restantes códigos da tabela síncrona ainda não foram observados neste endpoint
+    especificamente — ficam ``UNKNOWN`` até o serem."""
     base_url = resolve_base_url(
         environment, ENDPOINTS, acknowledge_no_sandbox=acknowledge_no_sandbox
     )
@@ -171,6 +183,8 @@ def get_order_status(
         status = PaymentStatus.PAID
     elif raw_status == STATUS_DECLINED_BY_USER:
         status = PaymentStatus.DECLINED
+    elif raw_status == STATUS_EXPIRED_OR_NOT_FOUND:
+        status = PaymentStatus.EXPIRED
     else:
         status = PaymentStatus.UNKNOWN
     return status, data

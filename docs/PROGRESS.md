@@ -67,6 +67,13 @@ concluído (mais recente no topo), mais o estado corrente.
   `UNKNOWN` como qualquer código não-"000"). Restantes códigos da tabela síncrona continuam
   ⚠️ não observados neste endpoint — não generalizado por dedução. 1 teste novo (112/112 SDK
   verde). Ver `docs/providers/ifthenpay-mbway.md`.
+- **2026-08-15 — caminho de expiração validado deixando um pagamento expirar**: terceiro
+  pagamento de €0,01, deixado passar sem aceitar nem recusar (janela real da app MB WAY do
+  utilizador: ~4 min). `EstadoPedidos[0].Estado == "123"` ("Operação financeira não
+  encontrada") — não há código dedicado a "expirado", a ifthenpay trata como transação
+  inexistente. Mapeado para `PaymentStatus.EXPIRED`, com ressalva documentada sobre a
+  ambiguidade teórica com um `IdPedido` inválido (não aplicável ao contrato de uso real desta
+  função). 1 teste novo (113/113 SDK verde). Ver `docs/providers/ifthenpay-mbway.md`.
 
 ## Incidentes reais (não evitados — corrigidos depois de acontecerem)
 

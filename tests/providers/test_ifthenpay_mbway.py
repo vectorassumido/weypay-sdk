@@ -183,6 +183,40 @@ def test_get_order_status_declined_by_user_matches_observed_shape() -> None:
 
 
 @responses.activate
+def test_get_order_status_expired_matches_observed_shape() -> None:
+    """Payload espelha uma expiração real (2026-08-15, janela de pagamento MB WAY deixada
+    passar deliberadamente, ~4 min, sem aceitar nem recusar) — não inventado. A ifthenpay não
+    tem código dedicado a "expirado": devolve "123" (transação não encontrada). Ver
+    docs/providers/ifthenpay-mbway.md."""
+    responses.add(
+        responses.GET,
+        STATUS_URL,
+        json={
+            "EstadoPedidos": [
+                {
+                    "IdPedido": "UChc9w7WiVl5JINp480t",
+                    "Estado": "123",
+                    "DataHoraPedidoRegistado": "15-08-2026 00:09:53",
+                    "DataHoraPedidoAtualizado": "15-08-2026 00:09:53",
+                    "MsgDescricao": "Operação financeira não encontrada",
+                }
+            ],
+            "Estado": "000",
+            "DataHora": "15-08-2026 00:14:07",
+            "MsgDescricao": "Operação concluída com sucesso.",
+        },
+        status=200,
+    )
+
+    status, data = mbway.get_order_status(mbway_key="KEY-1", payment_id="UChc9w7WiVl5JINp480t")
+
+    assert status == PaymentStatus.EXPIRED
+    orders = data["EstadoPedidos"]
+    assert isinstance(orders, list)
+    assert orders[0]["Estado"] == "123"
+
+
+@responses.activate
 def test_get_order_status_uses_the_nested_estado_not_the_top_level_one() -> None:
     """A resposta tem dois `Estado`: o de topo é do pedido HTTP (sempre "000" se a consulta
     correu), o que importa é o de dentro de EstadoPedidos[0]. "100" nunca foi observado neste

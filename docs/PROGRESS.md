@@ -25,6 +25,18 @@ concluído (mais recente no topo), mais o estado corrente.
   elas), Fase 4 (segurança `bookwey`) e Fase 5 (SIBS) por inteiro.
 - **Modo:** interativo (utilizador presente). Ver `docs/REPORT.md` para o relatório completo
   da execução autónoma 0a→3.
+- **2026-08-14 — pagamento sandbox real concluído com sucesso em `bookwey-serverless`**,
+  incluindo confirmação como "paga" no backoffice EuPago. Pelo caminho, dois problemas reais
+  encontrados e corrigidos (não hipotéticos — só apareceram com dinheiro/estado real):
+  1. Bug no SDK: `status.py::ENDPOINTS` tinha `/api` a mais → toda consulta de estado 404.
+     Corrigido (SDK commit `6740693`, `bookwey` commit `2782735` — `_eupago_status_base_url()`
+     separado de `_eupago_base_url()`). Fecha a última ⚠️ real: `estado_referencia == "paga"`
+     confirmado por observação direta.
+  2. `adminCallback`/`eupago_api_callback` inalcançável (`localhost`) impede marcar a
+     referência como paga no backoffice sandbox — não é bug de código, é requisito de
+     configuração; documentado em `docs/LOCAL-TESTING.md` e `docs/providers/eupago-mbway.md`.
+  Push real ao telemóvel nunca chega em sandbox — confirmado pelo utilizador como normal
+  (mesmo no projeto pré-migração), não uma falha desta migração.
 
 ## Incidentes reais (não evitados — corrigidos depois de acontecerem)
 

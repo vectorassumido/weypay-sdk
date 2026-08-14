@@ -79,12 +79,12 @@ def create_payment(
 
     if data is None or call.http_status is None or not (200 <= call.http_status < 300):
         raise GatewayRejected(
-            call.http_status or 0, data if data is not None else (call.response or "")
+            call.http_status or 0, data if data is not None else (call.response or ""), call=call
         )
 
     redirect_url = data.get("RedirectUrl")
     if not redirect_url:
-        raise GatewayRejected(call.http_status, data)
+        raise GatewayRejected(call.http_status, data, call=call)
 
     return PaymentResult(
         provider="ifthenpay.pinpay",

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .types import GatewayCall
 
 
 class PaymentError(Exception):
@@ -15,11 +18,18 @@ class GatewayUnavailable(PaymentError):
 
 
 class GatewayRejected(PaymentError):
-    """O gateway respondeu com um payload de erro estruturado (tipicamente 4xx)."""
+    """O gateway respondeu com um payload de erro estruturado (tipicamente 4xx).
 
-    def __init__(self, status_code: int, payload: dict[str, Any] | str) -> None:
+    ``call``, quando o provider o fornece, é o ``GatewayCall`` completo da chamada rejeitada
+    (já redigido) — permite à app auditar/registar mesmo uma chamada que falhou, sem ter de
+    reconstruir a informação a partir de ``status_code``/``payload`` sozinha."""
+
+    def __init__(
+        self, status_code: int, payload: dict[str, Any] | str, call: GatewayCall | None = None
+    ) -> None:
         self.status_code = status_code
         self.payload = payload
+        self.call = call
         super().__init__(f"o gateway rejeitou o pedido: HTTP {status_code} {payload}")
 
 

@@ -50,9 +50,11 @@ def test_successful_payment_request() -> None:
 
 
 @responses.activate
-def test_http_error_raises_gateway_rejected() -> None:
+def test_http_error_raises_gateway_rejected_with_call_attached() -> None:
+    """.call permite à app auditar/registar mesmo uma chamada rejeitada — ver
+    events/services/payments.py::_log_call no boxwey (Fase 2)."""
     responses.add(responses.POST, URL, json={"error": "boom"}, status=500)
-    with pytest.raises(GatewayRejected):
+    with pytest.raises(GatewayRejected) as exc_info:
         mbway.request_payment(
             mbway_key="K",
             reference="r",
@@ -61,14 +63,17 @@ def test_http_error_raises_gateway_rejected() -> None:
             email="a@b.pt",
             description="d",
         )
+    assert exc_info.value.call is not None
+    assert exc_info.value.call.http_status == 500
+    assert exc_info.value.call.provider == "ifthenpay.mbway"
 
 
 @responses.activate
-def test_missing_id_pedido_raises_gateway_rejected() -> None:
+def test_missing_id_pedido_raises_gateway_rejected_with_call_attached() -> None:
     responses.add(
         responses.POST, URL, json={"Estado": "999", "MsgDescricao": "invalid"}, status=200
     )
-    with pytest.raises(GatewayRejected):
+    with pytest.raises(GatewayRejected) as exc_info:
         mbway.request_payment(
             mbway_key="K",
             reference="r",
@@ -77,6 +82,8 @@ def test_missing_id_pedido_raises_gateway_rejected() -> None:
             email="a@b.pt",
             description="d",
         )
+    assert exc_info.value.call is not None
+    assert exc_info.value.call.http_status == 200
 
 
 @responses.activate

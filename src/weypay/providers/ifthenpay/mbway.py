@@ -80,12 +80,12 @@ def request_payment(
 
     if data is None or call.http_status != 200:
         raise GatewayRejected(
-            call.http_status or 0, data if data is not None else (call.response or "")
+            call.http_status or 0, data if data is not None else (call.response or ""), call=call
         )
 
     payment_id = str(data.get("IdPedido", "") or "")
     if not payment_id:
-        raise GatewayRejected(call.http_status, data)
+        raise GatewayRejected(call.http_status, data, call=call)
 
     raw_status = str(data.get("Estado", "") or "")
 

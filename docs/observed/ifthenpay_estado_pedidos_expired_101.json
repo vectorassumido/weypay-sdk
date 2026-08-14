@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "date": "2026-08-15",
+    "context": "Pagamento MB WAY real de €0,01 no boxwey-serverless (tenant local 'demo', conta de teste ifthenpay ITP_MBWAY_KEY), enviado para o número do utilizador — desta vez deixado expirar deliberadamente esperando a janela documentada completa (~5 min, com margem) antes de consultar, sem qualquer interação com o push. O utilizador recebeu uma notificação push de expiração da própria app MB WAY pouco depois dos ~4 minutos.",
+    "call": "GET https://mbway.ifthenpay.com/ifthenpaymbw.asmx/EstadoPedidosJSON?MbWayKey=<redigido>&canal=03&idspagamento=L9i3yCcQjk6XK2a5VOWf",
+    "note": "Diferente do teste anterior (docs/observed/ifthenpay_estado_pedidos_expired.json), que consultou mais cedo (~4 min, logo após confirmação do utilizador) e devolveu \"123\" (transação não encontrada). Este teste, com mais margem antes de consultar, devolveu \"101\" (expirada) — sugere que \"123\" pode ser um estado transitório logo a seguir ao corte, e \"101\" o estado estável depois de a ifthenpay processar a expiração."
+  },
+  "http_status": 200,
+  "response_body": {
+    "EstadoPedidos": [
+      {
+        "IdPedido": "L9i3yCcQjk6XK2a5VOWf",
+        "Estado": "101",
+        "DataHoraPedidoRegistado": "15-08-2026 00:21:41",
+        "DataHoraPedidoAtualizado": "15-08-2026 00:26:26",
+        "MsgDescricao": "Operação financeira expirada"
+      }
+    ],
+    "Estado": "000",
+    "DataHora": "15-08-2026 00:27:23",
+    "MsgDescricao": "Operação concluída com sucesso."
+  }
+}

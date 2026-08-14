@@ -121,23 +121,45 @@ restantes códigos da tabela (`048`, `100`, `104`, `111`, `113`, `122`, `125`) c
 ⚠️ não observados neste endpoint especificamente — ficam `UNKNOWN` até serem confirmados, não
 `DECLINED` por dedução. Ver `docs/observed/ifthenpay_estado_pedidos_declined.json`.
 
-### Expiração confirmada deixando a janela passar (2026-08-15)
+### Expiração confirmada — dois testes reais, dois códigos diferentes (2026-08-15)
 
-✅ Terceiro pagamento de €0,01, desta vez deixado expirar deliberadamente — a app MB WAY do
-utilizador mostrou uma janela de **~4 minutos** para autorizar (o "5 minutos" documentado é
-aproximado). Consultado depois de expirar: `EstadoPedidos[0].Estado == "123"`, `MsgDescricao:
-"Operação financeira não encontrada"`. **Não existe um código dedicado a "expirado"** — a
-tabela documenta `123` como "Financial transaction not found", e é isso que a ifthenpay
-devolve depois da janela passar: a transação deixa de existir para consulta, tal como se o
-`IdPedido` nunca tivesse sido válido. `get_order_status()` mapeia `"123"` para
-`PaymentStatus.EXPIRED`.
+✅ **Não existe um código dedicado a "expirado"** na tabela síncrona documentada — mas dois
+testes reais e deliberados (deixar o pagamento expirar sem tocar em nada) revelaram **dois
+códigos diferentes**, aparentemente por timing:
 
-⚠️ Ambiguidade residual, não eliminável só com esta observação: o mesmo `"123"` podia em
-teoria também aparecer para um `IdPedido` inválido/inexistente (nunca criado). Como
-`get_order_status()` só deve ser chamada com um `IdPedido` devolvido por `request_payment()`
-— nunca inventado — interpretar `"123"` como expiração é a leitura correta neste contrato de
-uso, mas fica registado para quem vier a reutilizar a função fora dele. Ver
-`docs/observed/ifthenpay_estado_pedidos_expired.json`.
+- **Terceiro pagamento de €0,01** — consultado logo depois de o utilizador confirmar que a
+  janela tinha passado (~4 min, sem margem extra): `EstadoPedidos[0].Estado == "123"`,
+  `MsgDescricao: "Operação financeira não encontrada"`. Ver
+  `docs/observed/ifthenpay_estado_pedidos_expired.json`.
+- **Quarto pagamento de €0,01** — desta vez esperada a janela documentada completa (~5 min,
+  com margem, sem qualquer interação, consultado só depois): `EstadoPedidos[0].Estado ==
+  "101"`, `MsgDescricao: "Operação financeira expirada"` — texto literal, ao contrário do
+  "123" anterior. `DataHoraPedidoAtualizado` reflete o momento real da expiração, não o da
+  criação (diferente do teste do "123", onde ficou igual à criação). Ver
+  `docs/observed/ifthenpay_estado_pedidos_expired_101.json`.
+
+⚠️ **Hipótese, não totalmente confirmada**: "123" parece ser um estado transitório, visível
+só numa janela curta logo a seguir ao corte (a transação ainda não foi "assentada" como
+expirada do lado da ifthenpay); "101" é o código estável depois de processada. Reforça isto:
+o utilizador recebeu uma **notificação push de expiração da própria app MB WAY**, pouco
+depois dos ~4 minutos — ou seja, a app do cliente já sabia da expiração antes de a consulta
+`EstadoPedidosJSON` refletir isso de forma estável. Interessante: `"101"` **não consta da
+tabela síncrona documentada**, mas o código original do `boxwey` (pré-migração,
+`client.py`) já incluía `"101"` no conjunto `STATUS_DECLINED` — confirma que a equipa
+original já tinha topado com este código em produção, mesmo sem documentação oficial que o
+explicasse.
+
+`get_order_status()` mapeia **ambos** `"101"` e `"123"` para `PaymentStatus.EXPIRED`
+(`STATUS_EXPIRED_CODES`) — os dois testes eram genuinamente expirações reais, nunca uma
+referência inventada. ⚠️ Ambiguidade residual, não eliminável só com estas observações: o
+mesmo `"123"` podia em teoria também aparecer para um `IdPedido` inválido/inexistente (nunca
+criado). Como `get_order_status()` só deve ser chamada com um `IdPedido` devolvido por
+`request_payment()` — nunca inventado — interpretar ambos como expiração é a leitura correta
+neste contrato de uso.
+
+**Recomendação prática para quem consumir isto**: não confiar num `"123"` isolado logo a
+seguir à janela expirar como sinal definitivo — se possível, dar mais alguns segundos e
+reconsultar antes de tratar como terminal, já que "101" pode chegar por trás.
 
 ## (f) Estado atual do código
 

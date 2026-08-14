@@ -111,15 +111,24 @@ STATUS_COMPLETED = "000"
 # tabela (048, 100, 104, 111, 113, 122, 125) ainda não foram observados especificamente aqui —
 # mapeiam para UNKNOWN até serem confirmados, não para DECLINED por dedução.
 STATUS_DECLINED_BY_USER = "020"
-# ✅ confirmado deixando a janela de pagamento expirar sem responder (2026-08-15, ~4 min —
-# a app MB WAY do utilizador mostrou esse limite): "123", MsgDescricao "Operação financeira
-# não encontrada". A tabela documenta "123" como "Financial transaction not found", não
-# "expired" — não há código dedicado a expiração. ⚠️ Risco de ambiguidade não eliminado: o
-# mesmo "123" poderia teoricamente também surgir para um IdPedido inexistente/inválido; como
-# get_order_status só é chamada com um IdPedido devolvido por request_payment (nunca
-# inventado), interpretar "123" como expirado é a leitura correta neste uso, mas fica
-# documentado para quem reutilizar o código fora desse contrato.
-STATUS_EXPIRED_OR_NOT_FOUND = "123"
+# ✅ dois códigos observados para expiração, em dois testes reais separados — não é o mesmo
+# código nas duas vezes, e a diferença parece ser de TIMING, não de causa:
+#
+# - "101" ("Operação financeira expirada", MsgDescricao literal) — observado consultando
+#   ~1 min depois da app MB WAY do utilizador já ter avisado por push que expirou (janela
+#   real ~4-5 min), com `DataHoraPedidoAtualizado` a refletir o momento da expiração. Este é
+#   o código ESTÁVEL, obtido depois de a ifthenpay já ter processado a expiração — não consta
+#   da tabela síncrona documentada (nem "101" nem "expirada" aparecem lá), mas o código
+#   original do `boxwey` (`client.py`, pré-migração) já incluía "101" no conjunto de recusa —
+#   confirma que a equipa original já tinha topado com isto em produção, mesmo sem doc oficial.
+# - "123" ("Operação financeira não encontrada") — observado num teste anterior, consultado
+#   momentos depois de o utilizador confirmar a expiração (~4 min, sem margem extra). ⚠️
+#   Hipótese não totalmente confirmada: pode ser um estado transitório de indexação, visível
+#   só numa janela curta logo a seguir ao corte, antes de a ifthenpay assentar no "101"
+#   estável. Mantido como EXPIRED também — ambos os testes eram genuinamente expirações reais,
+#   nunca uma referência inventada, e um consumidor que polle logo a seguir ao corte não
+#   deveria ver isto como "desconhecido".
+STATUS_EXPIRED_CODES = frozenset({"101", "123"})
 
 
 def get_order_status(
@@ -143,11 +152,11 @@ def get_order_status(
     ``EstadoPedidos[0]["Estado"]``, o estado do pagamento propriamente dito.
 
     ✅ "020" (recusa pelo utilizador) confirmado com uma recusa real (2026-08-15) e mapeado
-    para ``PaymentStatus.DECLINED``. ✅ "123" (janela de pagamento expirada sem resposta,
-    confirmado deixando expirar deliberadamente) mapeado para ``PaymentStatus.EXPIRED`` — não
-    há código dedicado a "expirado", a ifthenpay devolve "transação não encontrada". Os
-    restantes códigos da tabela síncrona ainda não foram observados neste endpoint
-    especificamente — ficam ``UNKNOWN`` até o serem."""
+    para ``PaymentStatus.DECLINED``. ✅ "101" e "123" (janela de pagamento expirada sem
+    resposta — dois testes reais separados devolveram códigos diferentes, ver
+    ``STATUS_EXPIRED_CODES``) mapeados para ``PaymentStatus.EXPIRED``. Os restantes códigos da
+    tabela síncrona ainda não foram observados neste endpoint especificamente — ficam
+    ``UNKNOWN`` até o serem."""
     base_url = resolve_base_url(
         environment, ENDPOINTS, acknowledge_no_sandbox=acknowledge_no_sandbox
     )
@@ -183,7 +192,7 @@ def get_order_status(
         status = PaymentStatus.PAID
     elif raw_status == STATUS_DECLINED_BY_USER:
         status = PaymentStatus.DECLINED
-    elif raw_status == STATUS_EXPIRED_OR_NOT_FOUND:
+    elif raw_status in STATUS_EXPIRED_CODES:
         status = PaymentStatus.EXPIRED
     else:
         status = PaymentStatus.UNKNOWN

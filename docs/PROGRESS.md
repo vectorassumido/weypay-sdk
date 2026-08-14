@@ -74,6 +74,17 @@ concluído (mais recente no topo), mais o estado corrente.
   inexistente. Mapeado para `PaymentStatus.EXPIRED`, com ressalva documentada sobre a
   ambiguidade teórica com um `IdPedido` inválido (não aplicável ao contrato de uso real desta
   função). 1 teste novo (113/113 SDK verde). Ver `docs/providers/ifthenpay-mbway.md`.
+- **2026-08-15 — segundo teste de expiração, desta vez esperando a janela documentada
+  completa (~5 min, sem qualquer interação) em vez de ~4 min**: devolveu um código
+  **diferente** do primeiro teste — `"101"` ("Operação financeira expirada", texto literal),
+  não `"123"` ("não encontrada"). Hipótese: "123" é transitório logo a seguir ao corte, "101"
+  o estado estável depois de a ifthenpay processar a expiração — reforçado por o utilizador
+  ter recebido uma notificação push de expiração da própria app MB WAY pouco depois dos
+  ~4 min. `"101"` não consta da tabela síncrona documentada, mas já estava no
+  `STATUS_DECLINED` do `boxwey` pré-migração — a equipa original já tinha topado com isto em
+  produção. `get_order_status()` passa a mapear ambos `"101"` e `"123"` para
+  `PaymentStatus.EXPIRED` (`STATUS_EXPIRED_CODES`). 1 teste novo (114/114 SDK verde). Ver
+  `docs/providers/ifthenpay-mbway.md`, `docs/OPEN-QUESTIONS.md` #22.
 
 ## Incidentes reais (não evitados — corrigidos depois de acontecerem)
 

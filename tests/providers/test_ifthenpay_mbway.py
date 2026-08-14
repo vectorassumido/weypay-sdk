@@ -185,8 +185,9 @@ def test_get_order_status_declined_by_user_matches_observed_shape() -> None:
 @responses.activate
 def test_get_order_status_expired_matches_observed_shape() -> None:
     """Payload espelha uma expiração real (2026-08-15, janela de pagamento MB WAY deixada
-    passar deliberadamente, ~4 min, sem aceitar nem recusar) — não inventado. A ifthenpay não
-    tem código dedicado a "expirado": devolve "123" (transação não encontrada). Ver
+    passar deliberadamente, ~4 min, sem aceitar nem recusar, consultado logo a seguir) — não
+    inventado. Um segundo teste real, com margem maior antes de consultar, devolveu "101" em
+    vez de "123" (ver teste seguinte) — ambos mapeiam para EXPIRED. Ver
     docs/providers/ifthenpay-mbway.md."""
     responses.add(
         responses.GET,
@@ -214,6 +215,42 @@ def test_get_order_status_expired_matches_observed_shape() -> None:
     orders = data["EstadoPedidos"]
     assert isinstance(orders, list)
     assert orders[0]["Estado"] == "123"
+
+
+@responses.activate
+def test_get_order_status_expired_101_matches_observed_shape() -> None:
+    """Payload espelha um segundo teste real de expiração (2026-08-15), desta vez esperando a
+    janela documentada completa (~5 min) antes de consultar — devolveu "101"
+    ("Operação financeira expirada", MsgDescricao literal), não "123" como o teste anterior
+    (consultado mais cedo). Não consta da tabela síncrona documentada, mas o código original
+    do `boxwey` (pré-migração) já incluía "101" no conjunto de recusa — confirma que já era
+    conhecido em produção. Ver docs/providers/ifthenpay-mbway.md."""
+    responses.add(
+        responses.GET,
+        STATUS_URL,
+        json={
+            "EstadoPedidos": [
+                {
+                    "IdPedido": "L9i3yCcQjk6XK2a5VOWf",
+                    "Estado": "101",
+                    "DataHoraPedidoRegistado": "15-08-2026 00:21:41",
+                    "DataHoraPedidoAtualizado": "15-08-2026 00:26:26",
+                    "MsgDescricao": "Operação financeira expirada",
+                }
+            ],
+            "Estado": "000",
+            "DataHora": "15-08-2026 00:27:23",
+            "MsgDescricao": "Operação concluída com sucesso.",
+        },
+        status=200,
+    )
+
+    status, data = mbway.get_order_status(mbway_key="KEY-1", payment_id="L9i3yCcQjk6XK2a5VOWf")
+
+    assert status == PaymentStatus.EXPIRED
+    orders = data["EstadoPedidos"]
+    assert isinstance(orders, list)
+    assert orders[0]["Estado"] == "101"
 
 
 @responses.activate

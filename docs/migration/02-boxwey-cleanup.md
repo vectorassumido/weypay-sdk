@@ -3,6 +3,45 @@
 Ao contrário de `01`, este passo **muda comportamento deliberadamente** — cada mudança tem um
 teste novo que a prova.
 
+## ✅ Executado em 2026-08-14 — **209/209 testes, `OK`**
+
+Todos os 6 passos concluídos, exatamente como planeado, mais uma correção adicional
+encontrada ao verificar (não no plano original — ver abaixo).
+
+- `client.py` apagado; `ClientTests` (3 testes que espiavam
+  `integrations.ifthenpay.client.requests.post`) removida por completo — cobertura equivalente
+  já existia em `weypay-sdk/tests/providers/test_ifthenpay_mbway.py` desde a Fase 0c.
+- **Encontrado ao verificar, fora do plano original**: `public_api/tests/test_checkout.py`
+  também espiava `integrations.ifthenpay.client.requests.post` em 2 testes
+  (`test_checkout_creates_pending_order_and_triggers_mbway`,
+  `test_gateway_failure_fails_order_returns_502`) — não estava listado em "Ficheiros
+  tocados" porque não tinha sido detetado na Fase 1 (só se procurou por referências a
+  `client.py` de forma sistemática agora). Corrigido da mesma forma: alvo do patch mudado
+  para `weypay.http.requests.request`.
+- `events/services/payments.py`: `initiate_payment` chama `weypay.providers.ifthenpay.mbway`
+  diretamente. **Decisão de correção adicional, não só a prevista**: `provider_reference` e
+  `provider` passam a ser gravados **antes** da chamada ao gateway, não depois — sem isto, um
+  timeout perderia a referência e um webhook legítimo que chegasse mais tarde nunca
+  encontraria a order (o próprio objetivo de "timeout → PENDING, não FAILED" ficaria sem
+  efeito prático). `PaymentIndeterminate` é apanhado dentro de `initiate_payment`, nunca
+  propaga — a order fica `PENDING`.
+- **Extensão pequena e justificada no SDK** (fora do plano original, decidida ao implementar):
+  `GatewayRejected` passou a levar o `GatewayCall` completo (`errors.py`, commit `8454b50`),
+  para o `GatewayCallLog` conseguir auditar também pedidos rejeitados, não só bem-sucedidos.
+- `views.py`: estado desconhecido → `200` (não `400`) + registo; cada callback (chave
+  inválida, valor divergente, ou processado) escreve um `GatewayCallLog`, com a chave sempre
+  excluída (nunca redigida-em-claro, excluída por completo — mesmo padrão que
+  `Order.provider_response` já usava).
+- `GatewayCallLog`: modelo, migration, admin read-only, app `integrations` registada em
+  `INSTALLED_APPS` (não estava — tinha de ser adicionada para as migrations funcionarem).
+- `core/phone.py`: `pt_national_digits` apagada (zero chamadores confirmado por `grep`); o
+  formato de telefone enviado ao ifthenpay (`nrtlm`) **não mudou** — permanece incerto qual o
+  formato exato esperado (ver `docs/providers/ifthenpay-mbway.md`), e sem evidência de que o
+  E.164 atual (que funciona em produção) esteja errado, a decisão foi não mexer.
+- **Resultado**: `ruff`/`mypy`/`makemigrations --check` limpos; `python manage.py test` →
+  **209/209, `OK`** — as 3 remoções (`ClientTests`) e as 3 adições (testes de auditoria do
+  webhook) cancelam-se exatamente no total.
+
 ## Pré-condições
 
 - `01-boxwey-adopt.md` concluído e verde — ✅ feito em 2026-08-14, 209/209 testes.

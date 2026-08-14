@@ -5,19 +5,18 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
-- **Fase:** 1 **concluída** — `boxwey-serverless` adota o SDK para o webhook ifthenpay.
-  **209/209 testes, `OK`, zero testes editados** (idêntico à baseline). Âmbito ajustado por
-  conflito real (ver Log): `client.py` não foi tocado, fica para a Fase 2, que já planeava
-  apagá-lo por completo.
-- **Próximo passo:** Fase 2 — `docs/migration/02-boxwey-cleanup.md`. Apagar `client.py` (e
-  `ClientTests`, cuja cobertura já existe no SDK), `initiate_payment` chama o SDK diretamente,
-  corrigir resposta a `estado` desconhecido (200 em vez de 400), tratamento de timeout
-  (`PENDING` em vez de `FAILED`), `GatewayCallLog` novo, resolver `core/phone.py`
-  (`pt_national_digits` morto). **Esta fase muda comportamento deliberadamente** — cada
-  mudança precisa de teste novo que a prove, ao contrário da Fase 1.
-- **Bloqueios abertos:** nenhum para a Fase 2. Reserva de número de teste real disponível
-  (condições estritas — ver `docs/OPEN-QUESTIONS.md` §"Número de teste em reserva"), mas
-  nenhuma fase autónoma depende dela hoje.
+- **Fase:** 2 **concluída** — `client.py` apagado, `initiate_payment` chama o SDK
+  diretamente, `estado` desconhecido no callback → 200 (não 400), `GatewayCallLog` novo
+  (auditoria em criação e webhook), `core/phone.py` limpo. **209/209 testes, `OK`**.
+- **Próximo passo:** Fase 3 — `docs/migration/03-bookwey-adopt.md`. Precisa primeiro de
+  `providers/eupago/` (mbway, split, pix, status, callbacks) e
+  `providers/ifthenpay/pinpay.py` já existe — só falta EuPago no SDK. Depois `bookwey-serverless`
+  adota o transporte. Pré-condição do próprio guião: `docs/OPEN-QUESTIONS.md` #1-3
+  já resolvidas na Fase 0b.
+- **Bloqueios abertos:** nenhum para começar os providers EuPago no SDK (não tocam nenhum
+  projeto consumidor). Reserva de número de teste real disponível (condições estritas — ver
+  `docs/OPEN-QUESTIONS.md` §"Número de teste em reserva"), mas nenhuma fase autónoma depende
+  dela hoje.
 - **Modo:** `/loop` auto-ritmado, sessão contínua.
 
 ## Incidentes reais (não evitados — corrigidos depois de acontecerem)
@@ -203,6 +202,41 @@ diretório persistido entre chamadas de Bash quando a chamada envolve git.
   só em `.env.manual` (nunca em ficheiro rastreado). Avaliação feita: **não usado** — nenhuma
   fase autónoma depende dele hoje. Ver `docs/OPEN-QUESTIONS.md` §"Número de teste em reserva",
   `docs/SECURITY.md` regra 10, e a skill `weypay-phase` restrição 10 (atualizadas as três).
+
+### 2026-08-14 — Fase 2: `client.py` apagado, auditoria ganha (commit `8454b50` no SDK; `boxwey` por commitar)
+- **SDK, commit `8454b50`**: `GatewayRejected` passou a levar o `GatewayCall` completo
+  (`errors.py`), com `mbway.py`/`pinpay.py` a anexá-lo — necessário para o `GatewayCallLog`
+  conseguir auditar também pedidos rejeitados, não só bem-sucedidos. 2 testes atualizados
+  (74 no SDK, contagem inalterada — só passaram a verificar `.call`).
+- **`boxwey`, ficheiros tocados** (nenhum commitado, regra 1):
+  - `integrations/apps.py`, `integrations/models.py` (`GatewayCallLog`), `integrations/admin.py`
+    (read-only), migration nova, `"integrations"` acrescentado a `INSTALLED_APPS` (não estava
+    registada). Passo aditivo isolado, verificado com 209/209 antes de continuar.
+  - `events/services/payments.py`: `initiate_payment` chama `weypay.providers.ifthenpay.mbway`
+    diretamente. **Correção além do plano original**: `provider_reference`/`provider` gravados
+    **antes** da chamada ao gateway — sem isto, um timeout perderia a referência e o objetivo
+    de "PENDING sobrevive a timeout" ficaria sem efeito prático (nenhum webhook futuro
+    conseguiria encontrar a order). `PaymentIndeterminate` apanhado aqui, nunca propaga.
+  - `integrations/ifthenpay/views.py`: estado desconhecido → 200 (era 400); todo o callback
+    (chave inválida, valor divergente, ou processado) escreve `GatewayCallLog`.
+  - `public_api/views.py`: `except PaymentGatewayError` → `except (GatewayUnavailable,
+    GatewayRejected)` — `PaymentIndeterminate` não aparece aqui porque nunca propaga.
+  - `core/phone.py`: `pt_national_digits` apagada (zero chamadores). Formato de `nrtlm`
+    **não alterado** — incerto qual o formato exato esperado, sem evidência de que o E.164
+    atual esteja errado (funciona em produção), decisão de não mexer.
+  - `integrations/ifthenpay/client.py` **apagado**. `ClientTests` (3 testes) removida —
+    cobertura equivalente já existe no SDK desde a Fase 0c.
+  - **Encontrado ao verificar, fora do plano original**: `public_api/tests/test_checkout.py`
+    também tinha 2 testes a espiar `integrations.ifthenpay.client.requests.post` — não
+    detetado na Fase 1 porque a procura por referências a `client.py` só foi feita
+    sistematicamente agora. Corrigidos da mesma forma (alvo do patch →
+    `weypay.http.requests.request`).
+- **Resultado**: `ruff`/`mypy`/`makemigrations --check` limpos no `boxwey` inteiro;
+  `python manage.py test` → **209/209, `OK`** (as 3 remoções de `ClientTests` e as 3 adições
+  de testes de auditoria do webhook cancelam-se exatamente no total).
+- `docs/migration/02-boxwey-cleanup.md` atualizado com "✅ Executado".
+- Sem incidentes de segurança nesta fase — sweep de credenciais e do número de telefone
+  limpo em ambos os repos antes do commit.
 
 ## Regras de retoma
 

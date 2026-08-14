@@ -60,15 +60,20 @@ Erro `401`: `{"transactionStatus":"Rejected","code":"...","text":"..."}`.
 
 ⚠️ `booksys-be/api/services/booking.py` lê `entity`/`reference`/`amount` da resposta — a spec
 documentada do endpoint **sem split** só promete `transactionID`/`reference`, não `entity`.
-**Parcialmente investigado na Fase 0b, não resolvido**: uma criação bem-sucedida de MB WAY
-dispara de imediato um push para o número indicado, sem esperar confirmação — testar isto
-exigiria um número de telefone de teste real, que o agente não tem e não pode adivinhar sem
-risco de notificar uma pessoa desconhecida (ver a regra de segurança em
-`docs/OPEN-QUESTIONS.md`). O único teste seguro feito foi com um número deliberadamente
-inválido: `HTTP 400 {"transactionStatus":"Rejected","code":"CUSTOMERPHONE_INVALID",...}`
+O único teste seguro feito na Fase 0b foi com um número deliberadamente inválido: `HTTP 400
+{"transactionStatus":"Rejected","code":"CUSTOMERPHONE_INVALID",...}`
 (`docs/observed/eupago_mbway_create_invalid_phone.json`) — confirma a forma do erro, não
-responde à pergunta sobre `entity`. Fica em `docs/OPEN-QUESTIONS.md` #2/#15, dependente de um
-número de teste fornecido pelo utilizador.
+respondia à pergunta sobre `entity`.
+
+✅ **#15 resolvido (2026-08-14, teste local real** — `bookwey-serverless`, merchant
+`salao-beleza-viva`, número de telefone real autorizado explicitamente pelo utilizador para
+este teste): criação **com split** (`salon_key != owner_key` para este merchant) devolveu
+`HTTP 200 {"entity": null, "reference": "320778", "amount": "15.00"}`. **`entity` existe na
+resposta mas vem `null`** para um pagamento MB WAY (não `Multibanco`) — `reference` e `amount`
+vêm sempre preenchidos. `booking.py`'s `pagamento.get("entity")` já lida com isto corretamente
+(devolve `None`, não levanta erro). O booking/push foi criado com sucesso; a variante **sem**
+split (`eupago_mbway.create_payment`) continua ⚠️ não observada com sucesso — este merchant usa
+o caminho com split.
 
 ## (e) Vocabulário de estado
 

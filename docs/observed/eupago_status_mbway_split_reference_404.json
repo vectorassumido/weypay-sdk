@@ -1,0 +1,10 @@
+{
+  "_meta": {
+    "date": "2026-08-14",
+    "context": "Teste local real em bookwey-serverless (branch weypay-sdk-migration): criar_pagamento_com_split() chamado via create_booking() para o merchant salao-beleza-viva, telefone real autorizado explicitamente pelo utilizador para este teste.",
+    "call": "POST {eupago_api_url}/api/clientes/rest_api/multibanco/info",
+    "payload_sent": {"referencia": "320778", "chave": "<redigido>", "entidade": "00000"}
+  },
+  "http_status": 404,
+  "response_body": "Page Not Found"
+}

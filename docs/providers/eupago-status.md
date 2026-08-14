@@ -87,6 +87,26 @@ documentado nem observado para outros valores.
   só precisa de replicar o path legado (`/clientes/rest_api/multibanco/info`), não o
   documentado publicamente, que 404 nesta sandbox.
 
+## (c'') Nova observação (2026-08-14): referência criada por `split-payments/mbway` devolve 404
+
+✅ **Observado, teste local real** (`bookwey-serverless`, merchant `salao-beleza-viva`, booking
+real via `create_booking()`, telefone autorizado explicitamente pelo utilizador): uma
+referência criada momentos antes por `split-payments/mbway` (`reference="320778"`) consultada
+no mesmo path legado (`/clientes/rest_api/multibanco/info`, com `entidade="00000"` — o valor
+placeholder do merchant) devolve **HTTP 404, corpo `"Page Not Found"`** — diferente do 200
+observado em (c') para a referência `320653`. Ver
+`docs/observed/eupago_status_mbway_split_reference_404.json`.
+
+⚠️ **Causa não determinada — não deduzir.** Hipóteses em aberto, nenhuma confirmada:
+(i) este endpoint legado é específico de referências Multibanco e não resolve referências
+MB WAY, mesmo criadas via o mesmo host/API key; (ii) o `entidade="00000"` (placeholder, não
+uma entidade Multibanco real) causa a rejeição; (iii) atraso de indexação entre criação e
+consulta. **Efeito prático, já verificado**: `verificar_pagamento_mbway()` no `bookwey` — que
+usa exatamente este endpoint, código idêntico antes e depois da migração — **nunca confirmou
+com sucesso um pagamento MB WAY por polling**, nem antes nem depois deste trabalho; isto não é
+uma regressão da Fase 3, é comportamento herdado e agora observado pela primeira vez. Registado
+em `docs/OPEN-QUESTIONS.md` como item a investigar antes de depender deste caminho na Fase 4.
+
 ## (f) Fonte
 
 [Reference Information](https://eupago.readme.io/reference/reference-information) ·

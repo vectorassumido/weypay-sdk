@@ -23,6 +23,7 @@ loop, não só a esta.
 |---|---|---|
 | ~~1~~ | `/clientes/rest_api/multibanco/info` devolve `estado` ou `estado_referencia`? | **Ambos.** `estado` (numérico) e `estado_referencia` (string, `"pendente"` observado) coexistem. `bookwey/api/services/payments.py:30,34` está correto. O endpoint `/multibanco/info` documentado publicamente devolve 404 nesta sandbox — é uma página de documentação para uma API diferente, não o path que o `bookwey` usa. Ver `docs/providers/eupago-status.md`, `docs/observed/eupago_status_*.json`. |
 | ~~3~~ | `successUrl`/`failUrl`/`backUrl` no PIX: aceites, ignorados, ou erro? | **Aceites, sem erro** — `HTTP 201` idêntico com e sem os três campos. Ver `docs/providers/eupago-pix.md`, `docs/observed/eupago_pix_*.json`. |
+| ~~15~~ | A resposta de `split-payments/mbway` traz mesmo `entity`+`reference`+`amount`? | **Teste local real, 2026-08-14** (utilizador presente, número próprio autorizado): `{"entity": null, "reference": "320778", "amount": "15.00"}`. `entity` vem `null` para MB WAY (não é erro), `reference`/`amount` sempre presentes. Ver `docs/providers/eupago-mbway.md`. |
 
 ## Parcialmente resolvida — limitada pela regra de segurança acima
 
@@ -52,7 +53,12 @@ verdadeiramente parada sem esta informação — registar aqui e em `PROGRESS.md
 | # | Questão | Gateway/doc | Bloqueia de facto? |
 |---|---|---|---|
 | 5 | `descricao` > 50 chars na ifthenpay MB WAY: trunca, ignora ou rejeita? | `ifthenpay-mbway.md` | Não — o SDK já trunca sempre, independentemente da resposta |
-| 15 | A resposta de `split-payments/mbway` traz mesmo `entity`+`reference`+`amount`? | `eupago-mbway.md` | Não — Fase 3 pode preservar o código atual sem confirmar |
+
+## Nova, descoberta em teste local real (2026-08-14)
+
+| # | Questão | O que se sabe agora | Bloqueia |
+|---|---|---|---|
+| 16 | `verificar_pagamento_mbway()` (`/clientes/rest_api/multibanco/info`) devolve 404 para uma referência criada por `split-payments/mbway` (`reference="320778"`, `entidade="00000"` placeholder) — o mesmo path que devolve 200 para outras referências (`docs/providers/eupago-status.md` (c'/c'')). Causa não determinada: endpoint pode ser Multibanco-only, `entidade` placeholder pode ser inválido, ou atraso de indexação. **Efeito prático: esta função de polling nunca confirmou com sucesso um pagamento MB WAY, nem antes nem depois da migração — comportamento herdado, não regressão.** | Não bloqueia Fase 3 (comportamento preservado). Bloqueia qualquer confiança futura em `verificar_pagamento_mbway()` para MB WAY — investigar antes da Fase 4 assentar reconciliação nele. |
 
 ## Precisam de acesso ao backoffice do utilizador
 

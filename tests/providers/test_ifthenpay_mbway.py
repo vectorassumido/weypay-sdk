@@ -150,10 +150,44 @@ def test_get_order_status_paid_matches_observed_shape() -> None:
 
 
 @responses.activate
+def test_get_order_status_declined_by_user_matches_observed_shape() -> None:
+    """Payload espelha uma recusa real (2026-08-15, utilizador recusou o push no telemóvel
+    deliberadamente para testar este caminho) — não inventado. Ver
+    docs/providers/ifthenpay-mbway.md."""
+    responses.add(
+        responses.GET,
+        STATUS_URL,
+        json={
+            "EstadoPedidos": [
+                {
+                    "IdPedido": "1L0UjIcVp3EzAF9iogWv",
+                    "Estado": "020",
+                    "DataHoraPedidoRegistado": "15-08-2026 00:06:28",
+                    "DataHoraPedidoAtualizado": "15-08-2026 00:06:40",
+                    "MsgDescricao": "Operação financeira cancelada pelo utilizador",
+                }
+            ],
+            "Estado": "000",
+            "DataHora": "15-08-2026 00:06:51",
+            "MsgDescricao": "Operação concluída com sucesso.",
+        },
+        status=200,
+    )
+
+    status, data = mbway.get_order_status(mbway_key="KEY-1", payment_id="1L0UjIcVp3EzAF9iogWv")
+
+    assert status == PaymentStatus.DECLINED
+    orders = data["EstadoPedidos"]
+    assert isinstance(orders, list)
+    assert orders[0]["Estado"] == "020"
+
+
+@responses.activate
 def test_get_order_status_uses_the_nested_estado_not_the_top_level_one() -> None:
     """A resposta tem dois `Estado`: o de topo é do pedido HTTP (sempre "000" se a consulta
-    correu), o que importa é o de dentro de EstadoPedidos[0] — um pagamento ainda pendente
-    tem topo "000" mas o pagamento em si não está pago."""
+    correu), o que importa é o de dentro de EstadoPedidos[0]. "100" nunca foi observado neste
+    endpoint especificamente (só documentado na tabela síncrona) — fica UNKNOWN, não DECLINED,
+    até ser confirmado por observação real, ao contrário de "020" (ver teste dedicado)."""
     responses.add(
         responses.GET,
         STATUS_URL,

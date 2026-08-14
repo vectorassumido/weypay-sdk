@@ -61,6 +61,12 @@ concluído (mais recente no topo), mais o estado corrente.
   adicionar suporte a `params=` (query string) a `perform_request()` — única chamada do SDK
   que não vai no corpo. Confirmado `PaymentStatus.PAID` para o pagamento real. 4 testes novos
   (111/111 SDK verde). Ver `docs/providers/ifthenpay-mbway.md`, `docs/OPEN-QUESTIONS.md` #20.
+- **2026-08-15 — caminho de recusa validado com uma recusa real**: segundo pagamento de
+  €0,01, desta vez recusado deliberadamente no telemóvel. `EstadoPedidos[0].Estado == "020"`
+  confirmado, mapeado para `PaymentStatus.DECLINED` em `get_order_status()` (antes caía em
+  `UNKNOWN` como qualquer código não-"000"). Restantes códigos da tabela síncrona continuam
+  ⚠️ não observados neste endpoint — não generalizado por dedução. 1 teste novo (112/112 SDK
+  verde). Ver `docs/providers/ifthenpay-mbway.md`.
 
 ## Incidentes reais (não evitados — corrigidos depois de acontecerem)
 

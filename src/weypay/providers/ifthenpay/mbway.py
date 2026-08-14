@@ -105,6 +105,12 @@ def request_payment(
 # SetPedidoJson "000" significa só "pedido enviado ao cliente" (aceitação do pedido). O mesmo
 # código é ambíguo consoante o endpoint — não interpretar um sem saber de qual resposta veio.
 STATUS_COMPLETED = "000"
+# ✅ confirmado com uma recusa real (2026-08-15): "020" devolvido por EstadoPedidos[0].Estado
+# quando o utilizador recusa o push no telemóvel, MsgDescricao "Operação financeira cancelada
+# pelo utilizador" — bate certo com a tabela síncrona documentada. Os restantes códigos dessa
+# tabela (048, 100, 104, 111, 113, 122, 123, 125) ainda não foram observados especificamente
+# aqui — mapeiam para UNKNOWN até serem confirmados, não para DECLINED por dedução.
+STATUS_DECLINED_BY_USER = "020"
 
 
 def get_order_status(
@@ -125,7 +131,11 @@ def get_order_status(
     `MbWayKey` (igual a `SetPedidoJson`, não `mbWayKey` como a documentação sugeria). A
     resposta tem **dois níveis de `Estado`**: o de topo é do pedido HTTP em si (sempre "000"
     se a consulta correu bem, mesmo que o pagamento não esteja pago); o que importa é
-    ``EstadoPedidos[0]["Estado"]``, o estado do pagamento propriamente dito."""
+    ``EstadoPedidos[0]["Estado"]``, o estado do pagamento propriamente dito.
+
+    ✅ "020" (recusa pelo utilizador) confirmado com uma recusa real (2026-08-15) e mapeado
+    para ``PaymentStatus.DECLINED``. Os restantes códigos da tabela síncrona ainda não foram
+    observados neste endpoint especificamente — ficam ``UNKNOWN`` até o serem."""
     base_url = resolve_base_url(
         environment, ENDPOINTS, acknowledge_no_sandbox=acknowledge_no_sandbox
     )
@@ -157,5 +167,10 @@ def get_order_status(
     orders = data.get("EstadoPedidos")
     order_status = orders[0] if isinstance(orders, list) and orders else {}
     raw_status = str(order_status.get("Estado", "") or "")
-    status = PaymentStatus.PAID if raw_status == STATUS_COMPLETED else PaymentStatus.UNKNOWN
+    if raw_status == STATUS_COMPLETED:
+        status = PaymentStatus.PAID
+    elif raw_status == STATUS_DECLINED_BY_USER:
+        status = PaymentStatus.DECLINED
+    else:
+        status = PaymentStatus.UNKNOWN
     return status, data

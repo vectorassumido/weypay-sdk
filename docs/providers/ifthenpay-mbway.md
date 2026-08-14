@@ -110,6 +110,17 @@ um job de "confirmar pagamentos pendentes há muito tempo" sem depender só do c
 no `boxwey` (MB WAY direto) como no `bookwey` (via PINPAY, se aplicável ao mesmo mecanismo —
 não verificado para PINPAY especificamente).
 
+### Recusa confirmada com uma recusa real (2026-08-15)
+
+✅ Segundo pagamento de €0,01, desta vez recusado deliberadamente no telemóvel para validar o
+caminho de recusa: `EstadoPedidos[0].Estado == "020"`, `MsgDescricao: "Operação financeira
+cancelada pelo utilizador"` — bate certo com a tabela síncrona documentada (`020` = "Financial
+transaction cancelled by the user"), agora confirmado também para `EstadoPedidosJSON`, não só
+para `SetPedidoJson`. `get_order_status()` mapeia `"020"` para `PaymentStatus.DECLINED`. Os
+restantes códigos da tabela (`048`, `100`, `104`, `111`, `113`, `122`, `123`, `125`) continuam
+⚠️ não observados neste endpoint especificamente — ficam `UNKNOWN` até serem confirmados, não
+`DECLINED` por dedução. Ver `docs/observed/ifthenpay_estado_pedidos_declined.json`.
+
 ## (f) Estado atual do código
 
 `boxwey/api/integrations/ifthenpay/client.py` — bom: timeout 15s (`TIMEOUT_SECONDS`),

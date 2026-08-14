@@ -8,14 +8,23 @@ concluído (mais recente no topo), mais o estado corrente.
 - **Fase:** 3 **concluída** (passos 1-3; passo 4 deliberadamente adiado — ver Log).
   `bookwey-serverless` adota o transporte SDK para EuPago/PINPAY. **91/91 testes, `OK`**,
   idêntico à baseline.
-- **Âmbito autónomo terminado.** Fases 0a→3 concluídas. Fases 4 e 5 exigem revisão presencial
-  e configuração nos backoffices dos gateways — fora do âmbito autónomo por desenho. Ver
-  `docs/REPORT.md` para o relatório completo.
+- **Âmbito autónomo original (0a→3) terminado e revisto pelo utilizador ao regressar.**
+- **2026-08-14 (regresso do utilizador) — política de commits nos consumidores mudou**: os
+  diffs das Fases 1-2 (`boxwey-serverless`) e Fase 3 (`bookwey-serverless`), que tinham ficado
+  por commitar (regra antiga), foram agora commitados numa branch dedicada
+  `weypay-sdk-migration` em cada repo (`boxwey` commit `9da26b9`, `bookwey` commit `9815c84`),
+  criada e commitada pelo utilizador interativamente — não pelo loop autónomo. `main` fica
+  intocado em ambos. **Decisão explícita do utilizador**: doravante, o trabalho autónomo
+  também pode commitar diretamente nesta branch (nunca em `main`, nunca `push`) — ver skill
+  `weypay-phase` restrição 1, atualizada. Antes de continuar Fase 4/5 ou qualquer trabalho
+  novo, confirmar sempre `git branch --show-current` é `weypay-sdk-migration` em cada
+  consumidor antes de commitar.
 - **Bloqueios abertos:** nenhum nas fases concluídas. Itens deliberadamente adiados, todos
   documentados: `providers/eupago/callback.py` (Fase 4), `Environment.FAKE` default em
   `bookwey`'s `development.py` (precisa de fixtures reais, quebraria testes existentes sem
   elas), Fase 4 (segurança `bookwey`) e Fase 5 (SIBS) por inteiro.
-- **Modo:** `/loop` parado no fim desta iteração — âmbito autónomo cumprido.
+- **Modo:** interativo (utilizador presente). Ver `docs/REPORT.md` para o relatório completo
+  da execução autónoma 0a→3.
 
 ## Incidentes reais (não evitados — corrigidos depois de acontecerem)
 

@@ -37,6 +37,18 @@ concluído (mais recente no topo), mais o estado corrente.
      configuração; documentado em `docs/LOCAL-TESTING.md` e `docs/providers/eupago-mbway.md`.
   Push real ao telemóvel nunca chega em sandbox — confirmado pelo utilizador como normal
   (mesmo no projeto pré-migração), não uma falha desta migração.
+- **2026-08-14 — terceiro problema real, desta vez no EuroPix**: `verificar_pagamento` também
+  404ava para pagamentos EuroPix, mesmo com o fix do `/api` acima. Causa diferente: `Payment.
+  reference` guardava `numeric_id` (id local gerado antes da chamada à EuPago, necessário para
+  `successUrl`), nunca substituído pela referência real que a EuPago devolve — bug presente
+  também no `main` pré-migração, nunca detetado por falta de teste. Corrigido (`bookwey`
+  commit `7ece22a`): `Payment.reference` passa a ser sempre a referência real; novo campo
+  `Payment.client_reference` guarda o id local, usado só para `check_payment_status` encontrar
+  o pagamento antes de a EuPago responder. Migration aditiva (`0002_payment_client_reference`,
+  schema-only). 4 testes novos + suite completa (95/95) verde. Verificado com pagamento
+  sandbox real: `Payment.reference="320787"` (EuPago), `client_reference="<id local>"`,
+  `check_payment_status(client_reference)` resolve sem 404. Ver
+  `docs/providers/eupago-pix.md`, `docs/OPEN-QUESTIONS.md` #19.
 
 ## Incidentes reais (não evitados — corrigidos depois de acontecerem)
 

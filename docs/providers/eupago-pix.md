@@ -47,13 +47,32 @@ Erro `401`: `{"transactionStatus":"Rejected","code":"APIKEY_MISSING","text":"...
 
 ## (e) Estado atual e delta
 
-- `utils.py:259`: `float(reservation_value)` — mesmo problema de `Decimal` que o MB WAY.
-- `utils.py:288,292`: `print()` em vez de log estruturado.
-- Zero `timeout=` (`:276`).
-- A referência interna usada por este fluxo é `numeric_id = str(schedule.id.int)[-15:]`
-  (`:237`), **derivada do UUID do `Schedule`** e devolvida ao browser em `success_url`
-  (`:247`) — mesma falha de previsibilidade documentada em `ifthenpay-callbacks.md` e
-  corrigida na Fase 4, não na 3 (a Fase 3 preserva comportamento).
+- ~~`utils.py:259`: `float(reservation_value)` — mesmo problema de `Decimal` que o MB WAY.~~
+  Corrigido na Fase 3 (`Money`).
+- ~~`utils.py:288,292`: `print()` em vez de log estruturado.~~ Corrigido na Fase 3.
+- ~~Zero `timeout=` (`:276`).~~ Corrigido na Fase 3 (transporte do SDK).
+
+### Bug real encontrado e corrigido (2026-08-14, pagamento sandbox real) — `Payment.reference` guardava o id local, não a referência da EuPago
+
+O que esta secção descrevia como "falha de previsibilidade, Fase 4" era na verdade um **bug
+funcional confirmado**, não só um problema de formato: `criar_pagamento_europix` guardava
+`numeric_id = str(schedule.id.int)[-15:]` em `Payment.reference` — precisa de existir **antes**
+da chamada à EuPago, para construir `successUrl`, mas nunca era substituído pela referência
+real que a EuPago devolve (`data.get("reference")`, ex. `"320651"`). Toda consulta de estado
+subsequente (`verificar_pagamento`, e `reconcile_pending_payments` em produção) interrogava a
+EuPago com o id local, que a EuPago nunca viu → **HTTP 404, sempre**, tanto no `bookwey`
+pré-migração como no pós-migração (não é regressão). Confirmado com um pagamento sandbox real:
+`Payment.reference` antigo (`"283649437471407"`) não batia com a referência real da EuPago
+(`"320651"`/`"320787"` observadas).
+
+**Corrigido** (`bookwey-serverless` commit `7ece22a`): `Payment.reference` passa a guardar
+sempre a referência real da EuPago (`data.get("reference")`), como já acontecia em MB
+WAY/split; o id local ganhou um campo próprio, `Payment.client_reference`, usado só para
+`check_payment_status()` encontrar o pagamento antes de a EuPago responder.
+`check_payment_status` passou a procurar por `reference` OU `client_reference`, e a consultar a
+EuPago sempre com `payment.reference` (nunca com o valor recebido do chamador). Reverificado
+com um pagamento sandbox real: `client_reference` encontra o `Payment`, a consulta de estado à
+EuPago já não 404. Ver `weypay-sdk/docs/OPEN-QUESTIONS.md`.
 
 ## (f) Fonte
 

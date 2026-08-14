@@ -52,6 +52,25 @@ Opcional `customer{notify, failOver, name, email, phone}`, não usado pelo `book
 (`{merchant.eupago_api_callback}/{agendamento_id}`) — ver delta em (g) e
 `docs/PLAN.md` §"Callbacks: uma URL comum?".
 
+### `adminCallback` tem de ser uma URL alcançável — confirmado, teste local real (2026-08-14)
+
+✅ **Observado**: com `adminCallback` apontando para `http://localhost:8000/...` (não
+alcançável pela internet — valor de seed local em `bookwey-serverless`), a criação do split
+payment devolve `HTTP 201` normalmente (`entity/reference/amount` presentes), **mas** a
+referência resultante não pôde ser marcada como paga no backoffice sandbox da EuPago
+(`"Ocorreu um erro! O estado da referência não foi alterado."`) — confirmado pelo utilizador,
+comparando lado a lado com o projeto `bookwey` (não-serverless), cujo merchant seed tem
+`eupago_api_callback="https://vectorassumido.com/api/test-callback"` (URL real). Repetindo a
+criação **só com essa URL trocada** (mesmo merchant, mesmas chaves, mesmo telefone) — a
+referência resultante (`320780`) foi marcada como paga com sucesso. ⚠️ Mecanismo exato não
+confirmado (a EuPago pode validar/pingar o `adminCallback` de forma assíncrona antes de
+ativar a referência para confirmação manual) — não deduzir mais do que isto. **Efeito
+prático**: testar localmente com sucesso ponta-a-ponta (incluindo marcar como pago no
+backoffice) exige um `eupago_api_callback` real e alcançável, não `localhost` — ver
+`docs/LOCAL-TESTING.md`. Não confirmado (nem esperado) que a EuPago sandbox alguma vez
+dispare o push real para o telefone — o utilizador confirma que isto **nunca** aconteceu,
+mesmo no projeto antigo, então não é um problema desta migração.
+
 ## (d) Response — verbatim
 
 Sucesso (`201`/`200`): sem split `{"transactionStatus":"Success","transactionID":"...","reference":"..."}`;

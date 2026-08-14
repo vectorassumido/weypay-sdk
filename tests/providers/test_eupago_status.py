@@ -1,5 +1,11 @@
 """Resposta espelha docs/observed/eupago_status_legacy_path.json (observação real de
-sandbox, Fase 0b) — não inventada."""
+sandbox, Fase 0b) — não inventada.
+
+URL corrigido em 2026-08-14: não leva ``/api`` (ver comentário em
+weypay/providers/eupago/status.py) — o valor anterior (`.../api/clientes/rest_api/...`)
+tinha o mesmo engano do código que testava, por isso passava sem detetar o bug real,
+só descoberto num teste local com um pagamento sandbox real
+(docs/observed/eupago_status_mbway_split_reference_404.json)."""
 
 import pytest
 import responses
@@ -8,7 +14,7 @@ from weypay.errors import GatewayRejected
 from weypay.providers.eupago.status import get_reference_status
 from weypay.types import Environment, PaymentStatus
 
-URL = "https://sandbox.eupago.pt/api/clientes/rest_api/multibanco/info"
+URL = "https://sandbox.eupago.pt/clientes/rest_api/multibanco/info"
 
 
 @responses.activate

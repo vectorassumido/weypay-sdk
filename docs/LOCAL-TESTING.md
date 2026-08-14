@@ -138,6 +138,19 @@ sai de verdade contra `sandbox.eupago.pt`. Consultar o estado via
 `docs/providers/eupago-status.md` (endpoint de reconciliação) para confirmar sem depender do
 callback.
 
+⚠️→✅ **`eupago_api_callback` tem de ser uma URL real e alcançável, mesmo neste nível —
+confirmado com um pagamento sandbox real, 2026-08-14.** O valor de `seed` (`http://
+localhost:8000/...`) não é alcançável pela EuPago; com ele, a criação funciona (`HTTP 201`,
+`Payment` fica `pending`), mas a referência resultante **não pode ser marcada como paga no
+backoffice sandbox** (`"O estado da referência não foi alterado."`). Para testar o percurso
+completo (marcar como pago manualmente no backoffice sandbox + confirmar por
+`verificar_pagamento_mbway`), definir `eupago_api_callback` no admin para qualquer URL pública
+válida e alcançável (não precisa de fazer nada com o pedido recebido — só de responder,
+mesmo que 404/200 genérico; ex. um endpoint de teste próprio, ou um túnel `cloudflared` para
+`/api/payments/callback`). A EuPago sandbox **nunca** dispara o push real para o telemóvel
+independentemente disto — confirmado pelo utilizador como comportamento normal da sandbox, não
+uma falha. Ver `docs/providers/eupago-mbway.md` §"adminCallback tem de ser uma URL alcançável".
+
 ### Nível 3 — callback real de ponta a ponta (fora do garantido)
 
 Mesma limitação do `boxwey`: precisa de túnel público + `adminCallback`/webhook registado no

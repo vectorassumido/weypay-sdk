@@ -1,0 +1,32 @@
+{
+  "_meta": {
+    "date": "2026-08-14",
+    "context": "Teste local real em bookwey-serverless: split-payments/mbway criado com adminCallback real e alcançável (https://vectorassumido.com/api/test-callback/<id>), marcado manualmente como pago no backoffice sandbox da EuPago pelo utilizador, consultado depois via verificar_pagamento_mbway() já corrigido (base_url sem /api).",
+    "reference": "320780"
+  },
+  "http_status": 200,
+  "response_body": {
+    "entidade": "00000",
+    "referencia": "320780",
+    "identificador": "e3ad573d-3ce7-4cd9-a725-6f35e635e36d",
+    "estado": 0,
+    "data_criacao": "2026-08-14",
+    "hora_criacao": "22:58:44",
+    "estado_referencia": "paga",
+    "pagamentos": [
+      {
+        "trid": 29751801,
+        "estado": "paga",
+        "valor": "15.00000",
+        "comissao": "0.17500",
+        "arquivada": false,
+        "data_pagamento": "2026-08-14",
+        "hora_pagamento": "22:59:02",
+        "local_pagamento": null,
+        "data_previsao_transferencia": "2026-08-18"
+      }
+    ],
+    "sucesso": true,
+    "resposta": "OK"
+  }
+}

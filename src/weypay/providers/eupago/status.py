@@ -3,6 +3,16 @@
 Usa o path LEGADO (``/clientes/rest_api/multibanco/info``), confirmado a funcionar em
 sandbox na Fase 0b — o path documentado publicamente (``/multibanco/info``) devolve 404
 neste host. Não trocar sem reobservar.
+
+Bug real corrigido em 2026-08-14 (teste local com pagamento real): ao contrário de
+``mbway.py``/``split.py``/``pix.py`` (cujos sufixos de endpoint, ex. ``/v1/split-payments/
+mbway``, assumem uma base já terminada em ``/api``), o path legado deste ficheiro **não**
+leva ``/api`` — o código original do `bookwey` chama
+``f"{merchant.eupago_api_url}/clientes/rest_api/multibanco/info"``, sem ``/api`` a meio.
+``ENDPOINTS`` tinha ``/api`` por engano (copiado dos outros providers), fazendo qualquer
+consulta de estado devolver 404. Nunca detetado antes porque a suite de testes tinha o
+mesmo engano embutido no URL esperado.
+Ver ``docs/observed/eupago_status_mbway_split_reference_404.json``.
 """
 
 from __future__ import annotations
@@ -12,8 +22,8 @@ from ...http import GatewayEndpoints, perform_request, resolve_base_url
 from ...types import Environment, PaymentStatus
 
 ENDPOINTS = GatewayEndpoints(
-    production="https://clientes.eupago.pt/api",
-    sandbox="https://sandbox.eupago.pt/api",
+    production="https://clientes.eupago.pt",
+    sandbox="https://sandbox.eupago.pt",
 )
 
 # ✅ observado em sandbox (Fase 0b): "pendente" confirmado real. ⚠️ valor de sucesso "paga"

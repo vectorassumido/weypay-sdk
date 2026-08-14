@@ -54,11 +54,13 @@ verdadeiramente parada sem esta informação — registar aqui e em `PROGRESS.md
 |---|---|---|---|
 | 5 | `descricao` > 50 chars na ifthenpay MB WAY: trunca, ignora ou rejeita? | `ifthenpay-mbway.md` | Não — o SDK já trunca sempre, independentemente da resposta |
 
-## Nova, descoberta em teste local real (2026-08-14)
+## Resolvidas em teste local real (2026-08-14, fora da Fase 0b — pagamento sandbox verdadeiro)
 
-| # | Questão | O que se sabe agora | Bloqueia |
-|---|---|---|---|
-| 16 | `verificar_pagamento_mbway()` (`/clientes/rest_api/multibanco/info`) devolve 404 para uma referência criada por `split-payments/mbway` (`reference="320778"`, `entidade="00000"` placeholder) — o mesmo path que devolve 200 para outras referências (`docs/providers/eupago-status.md` (c'/c'')). Causa não determinada: endpoint pode ser Multibanco-only, `entidade` placeholder pode ser inválido, ou atraso de indexação. **Efeito prático: esta função de polling nunca confirmou com sucesso um pagamento MB WAY, nem antes nem depois da migração — comportamento herdado, não regressão.** | Não bloqueia Fase 3 (comportamento preservado). Bloqueia qualquer confiança futura em `verificar_pagamento_mbway()` para MB WAY — investigar antes da Fase 4 assentar reconciliação nele. |
+| # | Questão | Resultado |
+|---|---|---|
+| ~~16~~ | `verificar_pagamento_mbway()` devolvia 404 para uma referência MB WAY real. Bug ou comportamento herdado? | **Bug real no SDK** (não herdado): `status.py::ENDPOINTS` tinha `/api` a mais, copiado por engano de `mbway.py`/`split.py`. Corrigido (`weypay-sdk` commit local + `bookwey-serverless` `_eupago_status_base_url()` separado de `_eupago_base_url()`). Reconfirmado com a mesma referência: `estado_referencia="paga"`, HTTP 200. Ver `docs/providers/eupago-status.md` (c''). |
+| ~~17~~ | `estado_referencia` de sucesso é mesmo `"paga"`? | **Confirmado, observação direta**: referência `320780`, marcada paga no backoffice sandbox pelo utilizador, consultada com sucesso — `estado_referencia: "paga"`. Ver `docs/providers/eupago-status.md` (c'''), `docs/observed/eupago_status_mbway_paid_confirmed.json`. |
+| ~~18~~ | `split-payments/mbway` com `adminCallback` inalcançável (`localhost`) — a EuPago aceita a criação mas bloqueia a confirmação? | **Sim, confirmado por comparação direta**: mesma criação, só o `adminCallback` trocado por uma URL real e alcançável, e a referência resultante passou a poder ser marcada como paga no backoffice sandbox (antes: `"O estado da referência não foi alterado."`). Ver `docs/providers/eupago-mbway.md` §"adminCallback tem de ser uma URL alcançável". Push real ao telemóvel continua nunca observado em sandbox — confirmado pelo utilizador como normal, não regressão. |
 
 ## Precisam de acesso ao backoffice do utilizador
 

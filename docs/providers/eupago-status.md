@@ -73,9 +73,9 @@ referência paga — não testável sem um pagamento real (PIX não se confirma 
 
 ## (d) Vocabulário de `estado_referencia`
 
-✅ `"pendente"` confirmado (observado). ⚠️ Valor de sucesso — o código assume `"paga"`, ainda
-não observado. `estado` numérico (`0` no caso pendente) — vocabulário completo não
-documentado nem observado para outros valores.
+✅ `"pendente"` e `"paga"` confirmados (observados — ver c', c'''). `estado` numérico (`0` nos
+dois casos observados, pendente e paga) — vocabulário completo não documentado nem observado
+para outros valores (`estado_referencia` é o campo fiável, não `estado`).
 
 ## (e) Estado atual e delta
 
@@ -83,29 +83,57 @@ documentado nem observado para outros valores.
 - `print()` em vez de log estruturado (`:408`, `:412`, `:447`, `:451`).
 - Cada função (`verificar_pagamento`, `verificar_pagamento_mbway`) duplica quase o mesmo
   corpo — candidatas naturais a ficarem finas sobre um único `get_reference_status()` do SDK.
-- **O código não estava errado** — retirar isto do backlog de "possível bug" da Fase 3; o SDK
-  só precisa de replicar o path legado (`/clientes/rest_api/multibanco/info`), não o
-  documentado publicamente, que 404 nesta sandbox.
+- ~~O código não estava errado~~ **Corrigido abaixo (c'') — o SDK tinha mesmo um bug real,
+  descoberto só num teste local com um pagamento sandbox verdadeiro.**
 
-## (c'') Nova observação (2026-08-14): referência criada por `split-payments/mbway` devolve 404
+## (c'') Bug real encontrado e corrigido (2026-08-14): `status.py` tinha `/api` a mais
 
 ✅ **Observado, teste local real** (`bookwey-serverless`, merchant `salao-beleza-viva`, booking
 real via `create_booking()`, telefone autorizado explicitamente pelo utilizador): uma
 referência criada momentos antes por `split-payments/mbway` (`reference="320778"`) consultada
-no mesmo path legado (`/clientes/rest_api/multibanco/info`, com `entidade="00000"` — o valor
-placeholder do merchant) devolve **HTTP 404, corpo `"Page Not Found"`** — diferente do 200
-observado em (c') para a referência `320653`. Ver
+via `verificar_pagamento_mbway()` devolvia **HTTP 404, corpo `"Page Not Found"`** — diferente
+do 200 observado em (c') para a referência `320653`. Ver
 `docs/observed/eupago_status_mbway_split_reference_404.json`.
 
-⚠️ **Causa não determinada — não deduzir.** Hipóteses em aberto, nenhuma confirmada:
-(i) este endpoint legado é específico de referências Multibanco e não resolve referências
-MB WAY, mesmo criadas via o mesmo host/API key; (ii) o `entidade="00000"` (placeholder, não
-uma entidade Multibanco real) causa a rejeição; (iii) atraso de indexação entre criação e
-consulta. **Efeito prático, já verificado**: `verificar_pagamento_mbway()` no `bookwey` — que
-usa exatamente este endpoint, código idêntico antes e depois da migração — **nunca confirmou
-com sucesso um pagamento MB WAY por polling**, nem antes nem depois deste trabalho; isto não é
-uma regressão da Fase 3, é comportamento herdado e agora observado pela primeira vez. Registado
-em `docs/OPEN-QUESTIONS.md` como item a investigar antes de depender deste caminho na Fase 4.
+**Causa raiz identificada (não é dedução — confirmada corrigindo e reobservando)**:
+`weypay/providers/eupago/status.py::ENDPOINTS` tinha `/api` no host canónico
+(`https://sandbox.eupago.pt/api`), copiado por engano de `mbway.py`/`split.py`/`pix.py` —
+esses **precisam** de `/api` porque os seus sufixos (`/v1/split-payments/mbway`,
+`/v1.02/mbway/create`) sempre levaram `/api` a meio no código original. O path legado deste
+ficheiro (`/clientes/rest_api/multibanco/info`) **nunca** levou `/api` no código original —
+`f"{merchant.eupago_api_url}/clientes/rest_api/multibanco/info"`, confirmado em
+`git show main:.../utils.py`. Resultado: toda consulta de estado ia para
+`.../api/clientes/rest_api/multibanco/info` (404) em vez de
+`.../clientes/rest_api/multibanco/info` (200). **A observação de 200 em (c') não detetou isto
+porque o script manual da Fase 0b usava o URL correto diretamente — o bug só entrou quando o
+provider do SDK foi escrito na Fase 0c com `ENDPOINTS` errado, e o próprio teste do provider
+(`tests/providers/test_eupago_status.py`) foi escrito com o mesmo engano no URL esperado, por
+isso passava.**
+
+**Correção**: `ENDPOINTS` sem `/api` (`https://sandbox.eupago.pt`, `https://clientes.eupago.pt`);
+`bookwey-serverless` ganhou `_eupago_status_base_url()` (sem `/api`), separado de
+`_eupago_base_url()` (com `/api`, só para criação). Teste do provider corrigido para o URL
+real. **Não é uma regressão da Fase 3 nem comportamento herdado do `bookwey`** — é um bug
+introduzido na Fase 0c/3 do próprio SDK, nunca antes exercitado com um pagamento real.
+
+## (c''') `estado_referencia` de sucesso — resolvido (2026-08-14, pagamento sandbox real)
+
+✅ **Confirmado, não mais ⚠️.** Referência `320780`, criada com `adminCallback` real e
+alcançável (ver `docs/providers/eupago-mbway.md` §"adminCallback deve ser alcançável"),
+marcada como paga manualmente no backoffice sandbox pelo utilizador, consultada com o
+`status.py` já corrigido:
+
+```json
+{
+  "estado_referencia": "paga",
+  "pagamentos": [{"trid": 29751801, "estado": "paga", "valor": "15.00000", ...}]
+}
+```
+
+`STATUS_PAID = "paga"` **confirmado exatamente como o código sempre assumiu** — não muda
+nada, só deixa de ser inferência. Ver `docs/observed/eupago_status_mbway_paid_confirmed.json`.
+Note-se também o campo adicional `pagamentos` (lista), não documentado nem usado hoje pelo
+`bookwey` — fica registado, sem ação associada.
 
 ## (f) Fonte
 

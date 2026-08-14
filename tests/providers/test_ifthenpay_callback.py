@@ -26,7 +26,10 @@ from weypay.money import Money
 from weypay.providers.ifthenpay.callback import (
     DEFAULT_MAPPING,
     extract_reference,
+    parse_status,
+    verify_amount,
     verify_and_parse,
+    verify_key,
 )
 from weypay.types import PaymentStatus
 
@@ -132,6 +135,55 @@ def test_extract_reference_works_before_key_is_known() -> None:
 def test_extract_reference_missing_raises() -> None:
     with pytest.raises(WebhookVerificationError, match="referencia"):
         extract_reference({"estado": "PAGO"})
+
+
+# --- funções granulares (verify_key/verify_amount/parse_status) --------------------------
+# Expostas separadamente para apps que precisam de distinguir a causa de uma falha por código
+# HTTP diferente (ex.: 403 chave inválida vs 400 valor divergente) sem fazer parsing de
+# mensagens de erro do WebhookVerificationError genérico.
+
+
+def test_verify_key_accepts_matching_key() -> None:
+    verify_key(_query(), CALLBACK_KEY)  # não levanta
+
+
+def test_verify_key_rejects_mismatch() -> None:
+    with pytest.raises(WebhookVerificationError):
+        verify_key(_query(chave="wrong"), CALLBACK_KEY)
+
+
+def test_verify_key_rejects_blank_expected() -> None:
+    with pytest.raises(WebhookVerificationError):
+        verify_key(_query(chave=""), "")
+
+
+def test_verify_amount_returns_none_when_absent() -> None:
+    assert verify_amount(_query(), Money(Decimal("20.00"))) is None
+
+
+def test_verify_amount_matches() -> None:
+    result = verify_amount(_query(valor="20.00"), Money(Decimal("20.00")))
+    assert result == Money(Decimal("20.00"))
+
+
+def test_verify_amount_mismatch_raises() -> None:
+    with pytest.raises(WebhookVerificationError):
+        verify_amount(_query(valor="999.99"), Money(Decimal("20.00")))
+
+
+def test_verify_amount_without_expected_still_parses() -> None:
+    result = verify_amount(_query(valor="20.00"), None)
+    assert result == Money(Decimal("20.00"))
+
+
+def test_parse_status_maps_known_values() -> None:
+    assert parse_status("PAGO") == PaymentStatus.PAID
+    assert parse_status("023") == PaymentStatus.REFUNDED
+    assert parse_status("020") == PaymentStatus.DECLINED
+
+
+def test_parse_status_unknown_never_raises() -> None:
+    assert parse_status("ZZZ") == PaymentStatus.UNKNOWN
 
 
 def test_payload_never_contains_the_key_in_clear() -> None:

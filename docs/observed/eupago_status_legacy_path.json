@@ -1,0 +1,20 @@
+{
+  "path": "/clientes/rest_api/multibanco/info",
+  "request": {
+    "referencia": "320653",
+    "chave": "***"
+  },
+  "status_code": 200,
+  "response": {
+    "entidade": null,
+    "referencia": "320653",
+    "identificador": "weypay-obs-status-b7fb3550",
+    "estado": 0,
+    "data_criacao": "2026-08-14",
+    "hora_criacao": "13:26:39",
+    "estado_referencia": "pendente",
+    "arquivada": false,
+    "sucesso": true,
+    "resposta": "OK"
+  }
+}

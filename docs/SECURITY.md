@@ -63,6 +63,16 @@ que o comportamento observável não piora.
    simultâneos para a mesma referência podem aplicar-se duas vezes antes que o primeiro
    `save()` complete.
 
+10. **Nunca disparar uma notificação push a um número de telefone não fornecido
+    explicitamente para esse fim.** Descoberta durante a Fase 0b: a chamada de *criação* de um
+    pagamento MB WAY (EuPago `mbway/create`/`split-payments/mbway`, ifthenpay `SetPedidoJson`)
+    dispara o push de imediato, sem esperar confirmação — ao contrário do PIX, que só gera uma
+    referência/QR sem contactar ninguém. Adivinhar ou inventar um número arrisca notificar uma
+    pessoa real e desconhecida. Regra permanente para qualquer teste automatizado contra estes
+    gateways: só números fornecidos pelo utilizador para esse fim exato; na falta deles, testar
+    só o que é seguro (respostas de erro com número deliberadamente inválido, ou métodos que não
+    envolvem push — PIX, Multibanco, consulta de estado).
+
 ## O que fica deliberadamente de fora
 
 Registry de plugins, cliente async, pydantic, ABCs de provider (um `Protocol` de tipagem

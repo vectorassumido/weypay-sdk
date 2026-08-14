@@ -60,8 +60,15 @@ Erro `401`: `{"transactionStatus":"Rejected","code":"...","text":"..."}`.
 
 ⚠️ `booksys-be/api/services/booking.py` lê `entity`/`reference`/`amount` da resposta — a spec
 documentada do endpoint **sem split** só promete `transactionID`/`reference`, não `entity`.
-Confirmar na Fase 0b se o endpoint sem split também devolve `entity`, ou se esse campo só
-existe na resposta com split (o que o código parece assumir indistintamente).
+**Parcialmente investigado na Fase 0b, não resolvido**: uma criação bem-sucedida de MB WAY
+dispara de imediato um push para o número indicado, sem esperar confirmação — testar isto
+exigiria um número de telefone de teste real, que o agente não tem e não pode adivinhar sem
+risco de notificar uma pessoa desconhecida (ver a regra de segurança em
+`docs/OPEN-QUESTIONS.md`). O único teste seguro feito foi com um número deliberadamente
+inválido: `HTTP 400 {"transactionStatus":"Rejected","code":"CUSTOMERPHONE_INVALID",...}`
+(`docs/observed/eupago_mbway_create_invalid_phone.json`) — confirma a forma do erro, não
+responde à pergunta sobre `entity`. Fica em `docs/OPEN-QUESTIONS.md` #2/#15, dependente de um
+número de teste fornecido pelo utilizador.
 
 ## (e) Vocabulário de estado
 

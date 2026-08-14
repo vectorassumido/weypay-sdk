@@ -12,23 +12,28 @@ até onde chegou). Três níveis, com garantias diferentes — ver `docs/PLAN.md
 
 ## Credenciais de sandbox/teste
 
-Vivem nos `.env` de cada projeto consumidor — **nunca** neste repositório. Valores fornecidos
-pelo utilizador (sandbox EuPago legada e conta de teste ifthenpay):
+Vivem nos `.env` de cada projeto consumidor — **nunca** neste repositório, nem sequer como
+exemplo. (Uma versão anterior deste ficheiro citava os valores reais fornecidos em conversa;
+foi um erro — corrigido aqui. Ver `docs/PROGRESS.md` para o registo do incidente.)
 
 ```bash
 # .env do bookwey-serverless/booksys-be — usadas pelo merchant seedado em desenvolvimento
 EUPAGO_API_URL=https://sandbox.eupago.pt
-EUPAGO_API_KEY=demo-REDACTED-eupago-api-key
-EUPAGO_OWNER_KEY=REDACTED-eupago-owner-key
-EUPAGO_SALON_KEY=REDACTED-eupago-salon-key
+EUPAGO_API_KEY=<a tua chave de sandbox EuPago>
+EUPAGO_OWNER_KEY=<a tua chave de beneficiário owner>
+EUPAGO_SALON_KEY=<a tua chave de beneficiário salão>
 
 # .env do boxwey-serverless/api — para o Tenant.mbway_key local
-ITP_MBWAY_KEY=REDACTED-itp-mbway-key
+ITP_MBWAY_KEY=<a tua chave de teste ifthenpay>
 ```
 
-⚠️ Como o `EUPAGO_SALON_KEY` fornecido é diferente do `EUPAGO_OWNER_KEY`, o `bookwey` vai pelo
-ramo de **split payments** em `criar_pagamento_com_split` (`utils.py:158`), não pelo MB WAY
-simples — ver `docs/providers/eupago-mbway.md` (c).
+Os scripts de observação da Fase 0b (`tests/manual/`) leem estas credenciais de
+`weypay-sdk/.env.manual` (não versionado, coberto pelo padrão `.env.*` do `.gitignore`) — nunca
+de um argumento de linha de comandos nem de um ficheiro rastreado pelo git.
+
+⚠️ Se `EUPAGO_SALON_KEY` for diferente de `EUPAGO_OWNER_KEY`, o `bookwey` vai pelo ramo de
+**split payments** em `criar_pagamento_com_split` (`utils.py:158`), não pelo MB WAY simples —
+ver `docs/providers/eupago-mbway.md` (c).
 
 ---
 
@@ -69,7 +74,7 @@ DJANGO_SUPERUSER_EMAIL=admin@local.test python manage.py seed --demo
 
 ### Nível 2 — conta de teste ifthenpay
 
-- `.env`: `ITP_MBWAY_KEY=REDACTED-itp-mbway-key`; usar essa chave em vez de `FAKE-TEST-KEY` no
+- `.env`: `ITP_MBWAY_KEY=<a tua chave de teste>`; usar essa chave em vez de `FAKE-TEST-KEY` no
   `Tenant.mbway_key` acima, e `WEYPAY_ENVIRONMENT=sandbox` — que para ifthenpay resolve para o
   **mesmo host de produção** (não há sandbox separada, ver `docs/ENVIRONMENTS.md`); é a chave
   de teste que isola o pagamento, não o host.
@@ -121,11 +126,11 @@ DJANGO_SETTINGS_MODULE=booksys_be.settings.development python manage.py seed
 ### Nível 2 — sandbox real EuPago
 
 ```bash
-# .env do booksys-be
+# .env do booksys-be — os mesmos valores citados no início deste documento
 EUPAGO_API_URL=https://sandbox.eupago.pt
-EUPAGO_API_KEY=demo-REDACTED-eupago-api-key
-EUPAGO_OWNER_KEY=REDACTED-eupago-owner-key
-EUPAGO_SALON_KEY=REDACTED-eupago-salon-key
+EUPAGO_API_KEY=<a tua chave de sandbox EuPago>
+EUPAGO_OWNER_KEY=<a tua chave de beneficiário owner>
+EUPAGO_SALON_KEY=<a tua chave de beneficiário salão>
 ```
 Colocar os mesmos valores nos campos correspondentes de `Merchant` no admin (são por-merchant,
 não globais — `docs/providers/eupago-mbway.md`). Repetir a marcação: o pedido de split MB WAY

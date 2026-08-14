@@ -1,0 +1,19 @@
+{
+  "request": {
+    "payment": {
+      "amount": {
+        "currency": "EUR",
+        "value": 1.0
+      },
+      "identifier": "weypay-obs-invalid-4af49700",
+      "customerPhone": "000000",
+      "countryCode": "+351"
+    }
+  },
+  "status_code": 400,
+  "response": {
+    "transactionStatus": "Rejected",
+    "code": "CUSTOMERPHONE_INVALID",
+    "text": "CustomerPhone is invalid"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "request": {
+    "payment": {
+      "amount": {
+        "currency": "EUR",
+        "value": 5.0
+      },
+      "identifier": "weypay-obs-0c96c1aa"
+    },
+    "customer": {
+      "name": "Teste Weypay",
+      "email": "teste@example.com",
+      "countryCode": "+351",
+      "phoneNumber": "912345678",
+      "notify": false
+    }
+  },
+  "status_code": 201,
+  "response": {
+    "transactionStatus": "Success",
+    "transactionID": "01a0003ced2c7c648488e981245551c9",
+    "reference": "320652",
+    "pixCode": "00020101021226910014br.gov.bcb.pix2569api.developer.btgpactual.com/pc/p/v2/80ec8114790b4834b892ab7db8e7af37520400005303986540531.435802BR5925PAGBRASIL PAGAMENTOS LTDA6012PORTO ALEGRE6208050414746304DB44",
+    "pixImage": "https://pagbrasil.com/x/img?MDAwMjAxMDEwMjEyMjY5MTAwMTRici5nb3YuYmNiLnBpeDI1NjlhcGkuZGV2ZWxvcGVyLmJ0Z3BhY3R1YWwuY29tL3BjL3AvdjIvODBlYzgxMTQ3OTBiNDgzNGI4OTJhYjdkYjhlN2FmMzc1MjA0MDAwMDUzMDM5ODY1NDA1MzEuNDM1ODAyQlI1OTI1UEFHQlJBU0lMIFBBR0FNRU5UT1MgTFREQTYwMTJQT1JUTyBBTEVHUkU2MjA4MDUwNDE0NzQ2MzA0REI0NA=="
+  }
+}

@@ -5,13 +5,44 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
-- **Fase:** 0a **concluída**. Próxima: 0b (verificar contra a sandbox tudo o que está ⚠️ em
-  `docs/OPEN-QUESTIONS.md`) — ver `docs/migration/00-setup.md`.
-- **Próximo passo:** criar `venv`, instalar `.[dev,sibs]`, escrever os scripts de
-  `tests/manual/` para as questões #1-7 de `docs/OPEN-QUESTIONS.md` e correr contra a
-  sandbox EuPago / conta de teste ifthenpay com as credenciais já fornecidas.
-- **Bloqueios abertos:** nenhum.
-- **Modo:** trabalho interativo (não `/loop`) nesta sessão.
+- **Fase:** 0b **concluída** (dentro do que é seguro fazer sozinho — ver regra de segurança
+  nova abaixo). Próxima: 0c (core + ifthenpay) — ver `docs/migration/00-setup.md`.
+- **Próximo passo:** `src/weypay/money.py`, `errors.py`, `types.py`, `redaction.py`, depois
+  `http.py` com `Environment` e o transporte `FAKE` a ler `docs/observed/`.
+- **Bloqueios abertos:** nenhum para a Fase 0c. Ficam em aberto (não bloqueiam) as questões
+  #2/#5/#15 de `OPEN-QUESTIONS.md` — dependem de um número de telefone de teste do utilizador.
+- **Modo:** `/loop` auto-ritmado, sessão contínua.
+
+## Incidentes reais (não evitados — corrigidos depois de acontecerem)
+
+### 2026-08-14 — credenciais de sandbox comitadas em claro em `docs/LOCAL-TESTING.md`
+Na Fase 0a, ao escrever o guião de teste local, copiei os valores reais das credenciais que o
+utilizador tinha colado na conversa (chave EuPago de sandbox, chaves de beneficiário,
+`ITP_MBWAY_KEY`) diretamente para `docs/LOCAL-TESTING.md`, como "exemplo". Isso violou a regra
+do próprio repositório ("O repo do SDK nunca contém uma credencial") e ficou commitado no
+commit `fb76f54`. Um resto truncado (`demo-f2be-...`) também entrou em `docs/ENVIRONMENTS.md`
+como exemplo de padrão.
+
+**Descoberto e corrigido na Fase 0b**, ao fazer uma varredura (`grep`) antes de commitar os
+scripts de observação — hábito que devia ter sido aplicado logo na Fase 0a. Correção: os dois
+ficheiros passaram a usar placeholders (`<a tua chave de sandbox EuPago>`); os valores reais
+vivem agora só em `.env.manual` (gitignored, nunca commitado, confirmado com
+`git check-ignore`).
+
+**O que fica por resolver, e não decidi sozinho**: os valores reais **continuam no histórico
+git** dos commits `fb76f54` e `44258bc` (que reescrevia o mesmo ficheiro). Como o repo nunca
+teve `git push` (regra 2) e não tem remote configurado, a exposição é local a esta máquina —
+mas apagá-la do histórico exigiria reescrever commits (`rebase`/`filter-branch`), uma operação
+destrutiva que as restrições invioláveis não cobrem explicitamente e que não vou fazer sem
+pedido direto. **Recomendação para o utilizador**: antes de este repositório ganhar um remote
+público, reescrever o histórico (`git rebase -i` ou recomeçar o repo do zero a partir do estado
+atual) para que os commits antigos não sobrevivam — ou trocar as credenciais de sandbox por
+precaução, já que passaram por git localmente. Sinalizado aqui com destaque para não passar
+despercebido no relatório final.
+
+**Hábito corrigido, daqui em diante**: antes de qualquer commit que toque `docs/`, correr
+`grep` pelos valores conhecidos de credenciais (ver lista em `.env.manual`, nunca copiada para
+aqui) sobre a árvore staged, não só confiar em nunca os ter escrito.
 
 ## Incidentes evitados
 
@@ -62,6 +93,37 @@ diretório persistido entre chamadas de Bash quando a chamada envolve git.
 - Quase-incidente registado acima (cwd persistido) — sem dano, hábito corrigido.
 - Nada instalado além do que já estava no sistema (Python 3.12.12, git 2.34.1, ambos
   pré-existentes). Nenhum `venv` criado ainda — fica para o primeiro passo da Fase 0b.
+
+### 2026-08-14 — Fase 0b: venv + observação real contra a sandbox EuPago
+- `venv` criado, `pip install -e ".[dev,sibs]"` — `requests 2.34.2`, `pytest 9.1.1`,
+  `responses 0.26.2`, `ruff 0.16.3`, `mypy 2.3.0`, `types-requests`, `cryptography 50.0.0`.
+  Tudo dentro do venv do projeto, nada global.
+- **Descoberta nova, registada como regra permanente** (`SECURITY.md` #10, skill `weypay-phase`
+  restrição 10): a criação de um pagamento MB WAY dispara o push de imediato, não só a
+  confirmação — logo nunca testar isso com um número de telefone adivinhado. Limitou o que a
+  Fase 0b conseguiu resolver sozinha.
+- `.env.manual` criado (gitignored, confirmado com `git check-ignore`) com as credenciais de
+  sandbox fornecidas pelo utilizador — nunca commitado.
+- 3 scripts em `tests/manual/`, corridos uma vez cada contra `sandbox.eupago.pt`:
+  - `observe_eupago_pix.py` — resolveu OPEN-QUESTIONS #3: `successUrl`/`failUrl`/`backUrl`
+    aceites sem erro (`HTTP 201` idêntico com/sem).
+  - `observe_eupago_status.py` — resolveu OPEN-QUESTIONS #1, **corrigindo uma suposição do
+    `PLAN.md`**: o path legado que o `bookwey` usa devolve `estado` E `estado_referencia`; o
+    endpoint documentado publicamente (`/multibanco/info`) devolve 404 nesta sandbox. O
+    código do `bookwey` estava correto — não há bug de polling.
+  - `observe_eupago_mbway_invalid_phone.py` — só testou número inválido por segurança (ver
+    acima); confirma a forma do erro (`400 CUSTOMERPHONE_INVALID`), não resolve se `entity`
+    vem numa criação bem-sucedida (fica ⚠️, dependente de número de teste do utilizador).
+- Atualizados: `docs/providers/eupago-status.md`, `eupago-pix.md`, `eupago-mbway.md`,
+  `docs/OPEN-QUESTIONS.md` (renumerado, 2 fechadas, 1 parcial, resto categorizado por
+  dependência), `docs/PLAN.md` (3 correções onde a observação contrariou o texto original).
+- **Incidente real corrigido** (ver secção acima): credenciais em claro em 2 ficheiros de
+  Fase 0a, substituídas por placeholders; valores reais ficam só no histórico git local, sem
+  remote — sinalizado ao utilizador, não resolvido sozinho (rescrever histórico é destrutivo).
+- Gates: `ruff check` + `ruff format --check` + `mypy` verdes (após corrigir `pyproject.toml`
+  — `ruff format` estava a tentar reformatar blocos de código dentro de `.md`, `extend-exclude
+  = ["*.md"]` adicionado). `pytest` sem testes ainda (esperado — chegam na Fase 0c).
+- Commit: ver `git log` — mensagem "Fase 0b: observação real contra a sandbox EuPago...".
 
 ## Regras de retoma
 

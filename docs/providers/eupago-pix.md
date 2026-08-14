@@ -25,14 +25,16 @@ Marcação: ✅ verificado / ⚠️ a confirmar. Fonte primária:
 }
 ```
 
-⚠️ **Discrepância real, não dedução — confirmada por leitura do código**:
+✅ **Resolvido (Fase 0b, observação direta em sandbox, 2026-08-14)**:
 `bookwey/booksys-be/integrations/payments/utils.py:255-266` envia, dentro de `payment{}`,
 `successUrl`, `failUrl` e `backUrl`, nenhum dos quais consta da especificação documentada
-acima. Três hipóteses, nenhuma decidível sem observar a sandbox: (1) são aceites e apenas não
-documentados; (2) são silenciosamente ignorados; (3) causam erro de schema e a chamada falha
-hoje sempre que a EuPago validar estritamente. Item central da Fase 0b — se (3) fosse
-verdade já teria quebrado produção, o que torna (1) ou (2) mais prováveis, mas não é
-suficiente para decidir sem observar.
+publicamente. Testado com um pedido idêntico com e sem esses três campos
+(`docs/observed/eupago_pix_with_urls.json` / `eupago_pix_without_urls.json`): **ambos
+devolvem `HTTP 201` com exatamente a mesma forma de resposta** (`transactionStatus`,
+`transactionID`, `reference`, `pixCode`, `pixImage`) — os campos são **aceites, sem erro**,
+hipótese (1) confirmada. Não há confirmação de que sejam *usados* (não são ecoados na
+resposta), só de que não quebram o pedido — comportamento suficiente para a Fase 3 manter o
+código como está.
 
 ## (c) Response — verbatim
 
@@ -55,4 +57,5 @@ Erro `401`: `{"transactionStatus":"Rejected","code":"APIKEY_MISSING","text":"...
 
 ## (f) Fonte
 
-[EuroPix](https://eupago.readme.io/reference/europix)
+[EuroPix](https://eupago.readme.io/reference/europix) · Observação direta em sandbox,
+2026-08-14: `docs/observed/eupago_pix_with_urls.json`, `eupago_pix_without_urls.json`.

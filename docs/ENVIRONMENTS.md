@@ -52,7 +52,7 @@ partir das observações reais de sandbox da Fase 0b quando existirem (`docs/obs
 ## Regras derivadas (testadas)
 
 - `PRODUCTION` nunca aceita uma credencial que bata num padrão conhecido de chave de teste
-  (ex.: prefixo `demo-` no EuPago, como em `EUPAGO_API_KEY=demo-f2be-...`).
+  (ex.: prefixo `demo-` no EuPago, como em `EUPAGO_API_KEY=demo-xxxx-xxxx-xxxx-xxx`).
 - `FAKE` nunca abre socket — se o teste tentar, falha alto, não silenciosamente.
 - Nenhum provider lê `Environment` de uma variável de ambiente por si — recebe-o explícito na
   chamada. Quem decide o ambiente é a aplicação (via a sua própria configuração), nunca o SDK

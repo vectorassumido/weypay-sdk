@@ -32,6 +32,9 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
+# A documentação em docs/ tem exemplos de código ilustrativos, não módulos executáveis —
+# ruff format não deve reescrever blocos de código dentro de Markdown.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "S", "RUF"]

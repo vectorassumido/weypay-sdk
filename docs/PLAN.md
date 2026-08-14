@@ -39,8 +39,15 @@ Duas consequências:
 - ⚠️ `STATUS_REFUNDED = "023"` e `STATUS_DECLINED = {"020","101","113"}` são comparados em `views.py:81-84` contra o `estado` do **callback**, que é textual — pelo que esses ramos possivelmente nunca disparam. Isto **não quebrou nada em produção**, porque o único caminho que importa (`PAGO`) funciona; o risco é que um estado fora do conjunto devolve HTTP 400 (`views.py:91`) e ✅ a ifthenpay repete até 13 vezes. Qual é o conjunto real de valores de `[ESTADO]` é pergunta para a ifthenpay — até haver resposta, responder 200 e registar é seguro em qualquer cenário, e é a única mudança que faço sem confirmação.
 - ⚠️ Como os nomes dos parâmetros são nossos, o `valor` pode não estar no template de algumas contas — o que explicaria o `if valor:` condicional em `views.py:62`. A verificar conta a conta no backoffice (tarefa tua); garantir `[VALOR]` em todas é correção de configuração, custo zero.
 
-**EuPago — o polling do `bookwey` pode nunca confirmar nada.** ✅ A resposta documentada de `/multibanco/info` traz o campo `estado` (exemplo oficial: `"entidade","referencia","identificador","estado","data_criacao","hora_criacao","arquivada","sucesso","resposta"`, com `"estado": "pendente"`); **não existe** `estado_referencia`. `api/services/payments.py:30,34` testa `data.get("estado_referencia") == "paga"`.
-⚠️ **Mas não concluo daqui que o polling está morto**: o `bookwey` chama o path *legado* `/clientes/rest_api/multibanco/info`, e a especificação acima é a do endpoint atual — a API antiga pode muito bem devolver `estado_referencia`. É exatamente o tipo de dedução que não quero fazer, e agora não preciso: com as credenciais de sandbox, a Fase 0c chama o endpoint e regista a resposta real.
+**EuPago — o polling do `bookwey` está correto** (✅ **atualizado pós-Fase 0b, 2026-08-14**:
+observação direta em sandbox, `docs/observed/eupago_status_legacy_path.json`). O texto
+original desta seção assumia, a partir da documentação pública de `/multibanco/info`, que
+`estado_referencia` não existia — mas essa é a documentação de um endpoint *diferente*
+(`/multibanco/info`, que devolve **404** em sandbox). O path real que o `bookwey` chama
+(`/clientes/rest_api/multibanco/info`) devolve **ambos** os campos, `estado` (numérico) e
+`estado_referencia` (string, `"pendente"` observado) — `api/services/payments.py:30,34` está
+correto. Fica corrigido aqui exatamente pela regra que este plano definiu: a observação ganha
+à dedução, mesmo quando a dedução parecia razoável a partir de documentação oficial real.
 - ✅ Existe **Webhooks 2.0**: `POST`, assinatura **HMAC-SHA256 no header `X-Signature`** (comparada contra o base64-decode da assinatura, com a chave de encriptação gerada no backoffice), estados `Paid/Refund/Error/Cancel/Expired`, retry 3×2min e depois horário durante 24h. O `X-Initialization-Vector` é outra coisa — só existe para a cifra AES-256-CBC opcional, não para autenticação.
 - ⚠️ O `bookwey` usa o **1.0**, cujos parâmetros ✅ incluem `chave_api` ("API Key used to create the reference"). Que sirva para *validar* o callback é **dedução minha** — a documentação não o diz. É segredo partilhado, portanto a inferência é razoável, mas confirma-se na Fase 0b antes de virar mecanismo de segurança.
 - ✅ Produção é `clientes.eupago.pt` (troca-se `sandbox` por `clientes`) — hoje implícito num campo de texto por merchant, sem flag de ambiente.
@@ -262,7 +269,7 @@ Regra: se a verificação **contradisser** o que o plano assume, ganha a observa
 - SDK ganha `providers/eupago/` e `providers/ifthenpay/pinpay.py`, escritos contra os docs oficiais.
 - As 6 funções de `utils.py` ficam finas: comissão (`calculate_commission_amount`, mantém-se — coberta por `tests/test_commission.py`) + chamada ao SDK + `Payment.objects.create`. Saem: `requests` direto, `print()`, `float()`.
 - `Environment` explícito (`sandbox.eupago.pt` ↔ `clientes.eupago.pt`) em vez do URL em texto livre por merchant; `FAKE` por default em desenvolvimento.
-- Riscos a controlar com teste de tabela payload-antigo-vs-novo: `float()` → `Decimal` muda o valor no fio em arredondamentos; e confirmar se `successUrl`/`failUrl`/`backUrl` são de facto ignorados no PIX (não constam da spec) antes de os remover.
+- Risco a controlar com teste de tabela payload-antigo-vs-novo: `float()` → `Decimal` muda o valor no fio em arredondamentos. ✅ `successUrl`/`failUrl`/`backUrl` no PIX **resolvido na Fase 0b** — aceites sem erro (`docs/observed/eupago_pix_*.json`), manter no código.
 
 ### Fase 4 — `bookwey`: fechar os buracos de segurança
 Duas falhas abertas, ambas com o mesmo efeito — **marcações confirmadas sem pagamento**:
@@ -272,7 +279,7 @@ Duas falhas abertas, ambas com o mesmo efeito — **marcações confirmadas sem 
 Correções, todas suportadas por mecanismo oficial:
 - **EuPago**: verificar a `chave_api` do callback 1.0 contra `merchant.eupago_api_key` (segredo partilhado que já existe e hoje é ignorado), em tempo constante, **e** validar `valor`/`referencia`. Migrar para **Webhooks 2.0** com assinatura `X-Signature` HMAC-SHA256 assim que o canal estiver configurado no backoffice — é o único que também notifica reembolso/expiração.
 - **PINPAY**: registar o callback anti-phishing no backoffice ifthenpay, **reutilizando os mesmos nomes de parâmetros do template do `boxwey`** (`chave`/`referencia`/`valor`/`estado`) — como os nomes são nossos, os dois projetos passam a partilhar um único parser. Remover o ramo `pinpay` de `check_payment_status`; até o callback estar registado, `pinpay` só confirma por callback verificado.
-- Investigar `estado_referencia` vs `estado` no `/multibanco/info` e corrigir — pode estar a impedir toda a confirmação por polling.
+- ~~Investigar `estado_referencia` vs `estado`~~ — ✅ resolvido na Fase 0b, sem bug: o campo existe e o código está correto (ver acima).
 - **Passar os callbacks a platform-wide** (`/api/v1/webhooks/eupago/`, `/api/v1/webhooks/ifthenpay/`), abandonando o `adminCallback` por-merchant com o id no path, e localizar o `Payment` pela referência do gateway como o `boxwey` faz.
 - **Trocar a referência por um token aleatório** em vez de `str(schedule.id.int)[-15:]`, requisito da URL única — **15 dígitos aleatórios** (`secrets`), porque o PINPAY exige `id` numérico com ≤ 15 caracteres. Migração de dados: só afeta pagamentos `pending`; os históricos mantêm a referência antiga (a coluna não muda de tipo nem de tamanho).
 - `select_for_update` + unique index de dedupe; `GatewayCallLog` copiado da Fase 2.

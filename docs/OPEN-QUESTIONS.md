@@ -4,15 +4,44 @@ Cada ⚠️ dos documentos em `docs/providers/` reunido aqui, com o que falta, c
 que bloqueia. Nada nesta lista vira código sem passar a ✅ — ver a regra 7 em
 `docs/PROGRESS.md`/`weypay-phase`: documentação oficial → sandbox → nunca dedução.
 
-## Resolúveis na Fase 0b (com as credenciais de sandbox já disponíveis)
+## Regra de segurança permanente, descoberta a aplicar durante a Fase 0b
+
+**Nunca disparar uma criação de pagamento MB WAY (EuPago `mbway/create`,
+`split-payments/mbway`, ou ifthenpay `SetPedidoJson`) com um número de telefone que não tenha
+sido explicitamente fornecido pelo utilizador para este fim.** A chamada de *criação*, não só
+a confirmação, é o que dispara a notificação push para o telefone indicado — ao contrário do
+PIX (que só gera uma referência/QR, sem contactar ninguém). Adivinhar ou inventar um número
+arriscaria notificar uma pessoa real e desconhecida sobre um pagamento que não pediu. Por isso
+as questões #2, #5 e #15 abaixo **não foram resolvidas por chamada real com sucesso** — só o
+que era seguro observar (respostas de erro com número deliberadamente inválido, ou mecanismos
+que não envolvem MB WAY) foi executado. Esta regra aplica-se a todas as iterações futuras do
+loop, não só a esta.
+
+## Resolvidas na Fase 0b (2026-08-14, observação direta em sandbox)
+
+| # | Questão | Resultado |
+|---|---|---|
+| ~~1~~ | `/clientes/rest_api/multibanco/info` devolve `estado` ou `estado_referencia`? | **Ambos.** `estado` (numérico) e `estado_referencia` (string, `"pendente"` observado) coexistem. `bookwey/api/services/payments.py:30,34` está correto. O endpoint `/multibanco/info` documentado publicamente devolve 404 nesta sandbox — é uma página de documentação para uma API diferente, não o path que o `bookwey` usa. Ver `docs/providers/eupago-status.md`, `docs/observed/eupago_status_*.json`. |
+| ~~3~~ | `successUrl`/`failUrl`/`backUrl` no PIX: aceites, ignorados, ou erro? | **Aceites, sem erro** — `HTTP 201` idêntico com e sem os três campos. Ver `docs/providers/eupago-pix.md`, `docs/observed/eupago_pix_*.json`. |
+
+## Parcialmente resolvida — limitada pela regra de segurança acima
+
+| # | Questão | O que se sabe agora | O que falta |
+|---|---|---|---|
+| 2 | A resposta de `/api/v1.02/mbway/create` (sem split) traz `entity`? | Testado só com número inválido (seguro): `HTTP 400 CUSTOMERPHONE_INVALID`, forma de erro confirmada. Ver `docs/observed/eupago_mbway_create_invalid_phone.json`. | Uma criação com sucesso, que só é segura com um número de telefone de teste **fornecido pelo utilizador**. |
+
+## Precisam de um número de telefone de teste do utilizador (não resolúveis pelo agente sozinho)
+
+| # | Questão | Gateway/doc | Bloqueia |
+|---|---|---|---|
+| 5 | `descricao` > 50 chars na ifthenpay MB WAY: trunca, ignora ou rejeita? | `ifthenpay-mbway.md` | Fase 2 — testável só com `SetPedidoJson`, que dispara push real |
+| 15 | A resposta de `split-payments/mbway` traz mesmo `entity`+`reference`+`amount`? | `eupago-mbway.md` | Fase 3 |
+
+## Precisam de acesso ao backoffice do utilizador
 
 | # | Questão | Gateway/doc | Como resolver | Bloqueia |
 |---|---|---|---|---|
-| 1 | `/clientes/rest_api/multibanco/info` (path legado usado pelo `bookwey`) devolve `estado` ou `estado_referencia`? Que valores? | `eupago-status.md` | Criar referência MB WAY em sandbox, consultar antes/depois de pagar | Fase 3 (se o polling estiver de facto morto, é um bug a corrigir, não a preservar) |
-| 2 | A resposta de `/api/v1.02/mbway/create` (sem split) traz `entity`? | `eupago-mbway.md` | Chamada real em sandbox | Fase 3 |
-| 3 | `successUrl`/`failUrl`/`backUrl` no PIX: aceites, ignorados, ou erro de schema? | `eupago-pix.md` | Chamada real com e sem esses campos | Fase 3 |
 | 4 | `chave_api` do Webhook 1.0 é mesmo o mecanismo de verificação, ou só está documentado como "a chave usada para criar a referência"? | `eupago-webhooks.md` | Configurar callback de sandbox para um túnel, pagar, observar | Fase 4 (fora do âmbito autónomo, mas a resposta informa-a) |
-| 5 | `descricao` > 50 chars na ifthenpay MB WAY: trunca, ignora ou rejeita? | `ifthenpay-mbway.md` | Conta de teste (`ITP_MBWAY_KEY`) | Fase 2 (decide se a correção do SDK é suficiente por si, ou se há de facto um bug ativo hoje) |
 | 6 | Que valores textuais de `[ESTADO]` chegam ao callback ifthenpay além de `PAGO`? Existe callback de recusa/cancelamento? | `ifthenpay-callbacks.md` | **Webhook Tester** oficial no backoffice ifthenpay | Fase 2 (mapear `STATUS_REFUNDED`/`STATUS_DECLINED` corretamente) |
 | 7 | O `bookwey`/PINPAY já tem algum callback registado no backoffice? Com que nomes de parâmetro? | `ifthenpay-pinpay.md` | Ler o backoffice ifthenpay da conta `bookwey` | Fase 4 |
 

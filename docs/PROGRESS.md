@@ -10,6 +10,19 @@ concluído (mais recente no topo), mais o estado corrente.
 - **Bloqueios abertos:** nenhum
 - **Modo:** trabalho interativo (não `/loop`) nesta sessão
 
+## Incidentes evitados
+
+### 2026-08-14 — cwd persistido apontava para `boxwey-serverless/api`
+Uma verificação de `seed.py` usou `cd /home/chrisdo/projects/boxwey-serverless/api && ...`
+para inspecionar o comando `seed`. O `cd` persistiu no shell entre chamadas de Bash (o
+comportamento documentado da ferramenta), e o `git add -A && git commit` seguinte correu
+**nesse diretório**, não em `weypay-sdk`. Sem dano: `git add -A` ali não encontrou nada para
+stage (`docs/LOCAL-TESTING.md` vive numa árvore completamente separada), o commit falhou com
+"nothing to commit", e o `git log` do `boxwey-serverless` ficou idêntico ao `origin/main`.
+**Correção de hábito, daqui em diante**: todo o comando `git` deste projeto leva
+`cd /home/chrisdo/projects/weypay-sdk &&` explícito no mesmo comando — nunca depender do
+diretório persistido entre chamadas de Bash quando a chamada envolve git.
+
 ## Log
 
 ### 2026-08-14 — Fase 0a, passo 1: esqueleto do repo

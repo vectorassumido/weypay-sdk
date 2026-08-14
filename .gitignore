@@ -1,0 +1,25 @@
+# Ambientes
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Ferramentas
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Segredos — este repo não contém nem pode conter credenciais.
+# As credenciais de sandbox vivem nos .env dos projetos consumidores.
+.env
+.env.*
+!.env.example
+*.pem
+*.key

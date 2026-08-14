@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weypay"
+version = "0.1.0.dev0"
+description = "Cliente partilhado para gateways de pagamento portugueses (ifthenpay, EuPago, SIBS)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+dependencies = ["requests>=2.32"]
+
+[project.optional-dependencies]
+# ifthenpay e eupago bastam-se com `requests` (já em dependencies). Os extras existem
+# para tornar a intenção explícita no requirements.txt de cada projeto consumidor.
+ifthenpay = []
+eupago = []
+# sibs é o único que traz mesmo dependência a mais: decifra AES-256-GCM do webhook.
+sibs = ["cryptography>=42"]
+dev = [
+    "pytest>=8",
+    "responses>=0.25",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "types-requests>=2.32",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "S", "RUF"]
+# S101: assert é legítimo em testes.
+per-file-ignores = { "tests/**" = ["S101"] }
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# tests/manual/ são scripts de observação contra sandbox, corridos à mão (Fase 0b).
+addopts = "--ignore=tests/manual"

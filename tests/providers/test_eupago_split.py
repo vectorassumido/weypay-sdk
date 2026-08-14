@@ -122,3 +122,20 @@ def test_error_response_raises_gateway_rejected() -> None:
             admin_callback="https://example.test/cb",
             environment=Environment.SANDBOX,
         )
+
+
+@responses.activate
+def test_base_url_override() -> None:
+    custom_url = "https://per-merchant.example.pt/api/v1/split-payments/mbway"
+    responses.add(responses.POST, custom_url, json={"transactionStatus": "Success"}, status=200)
+    create_split_payment(
+        api_key="K",
+        method="mbway",
+        identifier="id",
+        amount=Money(Decimal("20.00")),
+        beneficiaries=_beneficiaries(),
+        admin_callback="https://example.test/cb",
+        environment=Environment.SANDBOX,
+        base_url="https://per-merchant.example.pt/api",
+    )
+    assert responses.calls[0].request.url == custom_url

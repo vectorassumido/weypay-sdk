@@ -40,12 +40,13 @@ def create_split_payment(
     alias: str | None = None,
     lang: str = "PT",
     environment: Environment,
+    base_url: str | None = None,
 ) -> PaymentResult:
     """``POST /v1/split-payments/{method}``. ``method`` ∈ multibanco|mbway|pix|creditcard|
     applepay|googlepay (ver docs/providers/eupago-mbway.md (c)). ``alias`` é o telefone,
-    só usado no método ``mbway``."""
-    base_url = resolve_base_url(environment, ENDPOINTS)
-    url = f"{base_url}/v1/split-payments/{method}"
+    só usado no método ``mbway``. ``base_url``: ver docstring de mbway.create_payment."""
+    resolved_base_url = base_url or resolve_base_url(environment, ENDPOINTS)
+    url = f"{resolved_base_url}/v1/split-payments/{method}"
     payload: dict[str, object] = {
         "amount": amount.to_gateway_number(),
         "identifier": identifier,

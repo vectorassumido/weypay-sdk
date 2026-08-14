@@ -128,3 +128,23 @@ def test_production_and_sandbox_hosts() -> None:
 
     assert ENDPOINTS.production == "https://clientes.eupago.pt/api"
     assert ENDPOINTS.sandbox == "https://sandbox.eupago.pt/api"
+
+
+@responses.activate
+def test_base_url_override() -> None:
+    custom_url = "https://per-merchant.example.pt/api/v1.02/pix/create"
+    responses.add(
+        responses.POST,
+        custom_url,
+        json={"transactionStatus": "Success", "reference": "r"},
+        status=201,
+    )
+    create_payment(
+        api_key="K",
+        identifier="id",
+        amount=Money(Decimal("5.00")),
+        customer=_customer(),
+        environment=Environment.SANDBOX,
+        base_url="https://per-merchant.example.pt/api",
+    )
+    assert responses.calls[0].request.url == custom_url

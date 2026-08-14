@@ -36,10 +36,11 @@ def create_payment(
     back_url: str | None = None,
     lang: str = "PT",
     environment: Environment,
+    base_url: str | None = None,
 ) -> PaymentResult:
-    """``POST /v1.02/pix/create``."""
-    base_url = resolve_base_url(environment, ENDPOINTS)
-    url = f"{base_url}/v1.02/pix/create"
+    """``POST /v1.02/pix/create``. ``base_url``: ver docstring de mbway.create_payment."""
+    resolved_base_url = base_url or resolve_base_url(environment, ENDPOINTS)
+    url = f"{resolved_base_url}/v1.02/pix/create"
 
     payment: dict[str, object] = {
         "amount": {"currency": amount.currency, "value": amount.to_gateway_number()},

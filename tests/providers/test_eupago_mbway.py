@@ -77,3 +77,25 @@ def test_rejected_response_raises_gateway_rejected_with_call() -> None:
 def test_endpoints_match_sandbox_and_production() -> None:
     assert ENDPOINTS.sandbox == "https://sandbox.eupago.pt/api"
     assert ENDPOINTS.production == "https://clientes.eupago.pt/api"
+
+
+@responses.activate
+def test_base_url_override_bypasses_canonical_resolution() -> None:
+    """Para consumidores (bookwey) que guardam o URL exato por-conta e não podem assumir
+    que bate certo com o host canónico da SDK — ver docs/migration/03-bookwey-adopt.md."""
+    custom_url = "https://per-merchant.example.pt/api/v1.02/mbway/create"
+    responses.add(
+        responses.POST,
+        custom_url,
+        json={"transactionStatus": "Success", "reference": "r"},
+        status=201,
+    )
+    create_payment(
+        api_key="K",
+        identifier="id",
+        amount=Money(Decimal("1")),
+        customer_phone="912345678",
+        environment=Environment.SANDBOX,
+        base_url="https://per-merchant.example.pt/api",
+    )
+    assert responses.calls[0].request.url == custom_url

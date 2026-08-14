@@ -29,11 +29,12 @@ def get_reference_status(
     reference: str,
     entity: str | None = None,
     environment: Environment,
+    base_url: str | None = None,
 ) -> tuple[PaymentStatus, dict[str, object]]:
     """Consulta de leitura — faz retry (2 tentativas, só em erro de ligação/5xx, nunca 4xx;
-    ver docs/SECURITY.md regra 1)."""
-    base_url = resolve_base_url(environment, ENDPOINTS)
-    url = f"{base_url}/clientes/rest_api/multibanco/info"
+    ver docs/SECURITY.md regra 1). ``base_url``: ver docstring de mbway.create_payment."""
+    resolved_base_url = base_url or resolve_base_url(environment, ENDPOINTS)
+    url = f"{resolved_base_url}/clientes/rest_api/multibanco/info"
     payload: dict[str, str] = {"referencia": reference, "chave": api_key}
     if entity:
         payload["entidade"] = entity

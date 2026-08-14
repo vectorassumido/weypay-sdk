@@ -33,6 +33,7 @@ def create_payment(
     customer_phone: str,
     country_code: str = "+351",
     environment: Environment,
+    base_url: str | None = None,
 ) -> PaymentResult:
     """MB WAY sem split — ``POST /v1.02/mbway/create``.
 
@@ -40,9 +41,14 @@ def create_payment(
     documentada só promete ``transactionID``/``reference`` (ver
     docs/providers/eupago-mbway.md (d), docs/OPEN-QUESTIONS.md #2/#15). ``PaymentResult.entity``
     fica ``None`` aqui; se um dia se confirmar que o campo existe, atualizar sem quebrar o
-    contrato (o campo já existe no tipo, só não é preenchido nesta função)."""
-    base_url = resolve_base_url(environment, ENDPOINTS)
-    url = f"{base_url}/v1.02/mbway/create"
+    contrato (o campo já existe no tipo, só não é preenchido nesta função).
+
+    ``base_url``, quando dado, substitui a resolução por ``environment``/``ENDPOINTS`` —
+    para consumidores que já guardam o URL exato por-conta (ex.: `bookwey`'s
+    `Merchant.eupago_api_url`) e não podem assumir que bate certo com o host canónico da
+    SDK. `environment` continua obrigatório (decide o transporte FAKE)."""
+    resolved_base_url = base_url or resolve_base_url(environment, ENDPOINTS)
+    url = f"{resolved_base_url}/v1.02/mbway/create"
     payload = {
         "payment": {
             "amount": {"currency": amount.currency, "value": amount.to_gateway_number()},

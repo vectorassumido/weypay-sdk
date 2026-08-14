@@ -88,3 +88,16 @@ def test_entity_included_when_provided() -> None:
     body = responses.calls[0].request.body
     assert body is not None
     assert _json.loads(body)["entidade"] == "12345"
+
+
+@responses.activate
+def test_base_url_override() -> None:
+    custom_url = "https://per-merchant.example.pt/api/clientes/rest_api/multibanco/info"
+    responses.add(responses.POST, custom_url, json={"estado_referencia": "pendente"}, status=200)
+    get_reference_status(
+        api_key="K",
+        reference="r",
+        environment=Environment.SANDBOX,
+        base_url="https://per-merchant.example.pt/api",
+    )
+    assert responses.calls[0].request.url == custom_url

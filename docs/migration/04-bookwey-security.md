@@ -5,24 +5,31 @@ que a Fase 3 não precise de decidir nada aqui — fica escrito e pronto para re
 Muda a semântica de confirmação de pagamento de um sistema em produção e depende de
 configuração nos backoffices dos gateways, que só o utilizador pode fazer.
 
-## As duas falhas
+## As duas falhas (uma continua aberta, ver estado de cada uma abaixo)
 
 1. `api/services/payments.py:11-19` — `GET /api/pagamento-callback/<schedule_uuid>/` é
    público, sem autenticação, e **confirma o pagamento sem contactar o gateway**. Basta
    conhecer o UUID de um `Schedule`.
-2. `api/services/payments.py:26-27` — `check_payment_status` confirma qualquer pagamento
-   `pinpay` sem contactar a ifthenpay; a referência (`str(schedule.id.int)[-15:]`) é
-   devolvida ao browser.
+2. ~~`api/services/payments.py:26-27` — `check_payment_status` confirma qualquer pagamento
+   `pinpay` sem contactar a ifthenpay~~ — **✅ CORRIGIDA (2026-08-18, `bookwey` commit
+   `e253ec2`).**
 
-   ✅ **Webhook registado e confirmado a funcionar de ponta a ponta (2026-08-18)**: callback
-   registado nas contas `APPLE`/`GOOGLE` do backoffice ifthenpay, apontando para
-   `http://localhost:8000` via túnel `cloudflared` efémero. Pagamento real de €0,01 via Apple
-   Pay (noutro dispositivo — a falha de redirecionamento local não interessa aqui, o webhook é
-   servidor-a-servidor, não depende do browser do comprador). Resultado observado, sem
-   nenhuma chamada manual: `GatewayCallLog(outcome="paid", http_status=200,
-   request={'referencia': '199928337085928', 'valor': '0.01', 'estado': 'PAGO'})`,
-   `Payment.status` passou a `"confirmed"` sozinho. **Esta é agora a ordem cumprida**: registar
-   → confirmar ao vivo → o ramo `pinpay` de `check_payment_status` pode ser removido a seguir.
+   **Achado crítico que motivou corrigir imediatamente, antes do deploy**, ao verificar com o
+   utilizador se era seguro avançar para produção: `reconcile_pending_payments` (job
+   agendado, cada 5 min, presente desde o "Initial commit" de `bookwey-serverless` — **não**
+   introduzido por esta migração) chama `check_payment_status()` para todo o `Payment`
+   `pending` há mais de 15 minutos. Combinado com a falha #2, isto significa que **qualquer
+   pagamento PINPAY pendente há mais de ~15-20 min era automaticamente marcado como pago em
+   produção, com ou sem pagamento real** — confirmado lendo `main` diretamente, não por
+   dedução. Falha ativa, silenciosa, já em produção antes de qualquer trabalho desta migração.
+
+   Sequência que tornou a correção segura: registar o callback nas contas `APPLE`/`GOOGLE` do
+   backoffice ifthenpay → confirmar a funcionar de ponta a ponta com um pagamento real de
+   €0,01 via túnel `cloudflared` (`GatewayCallLog(outcome="paid", http_status=200)`,
+   `Payment.status` passou a `"confirmed"` sozinho, sem chamada manual) → só então remover o
+   ramo inseguro. `check_payment_status` para `pinpay` deixa de fazer qualquer coisa — a
+   confirmação é exclusiva do webhook verificado; a função só reflete o que ele já confirmou.
+   2 testes de regressão substituem o teste que provava a falha.
 
 ## Correções, cada uma dependente de uma ação do utilizador primeiro
 
@@ -64,17 +71,18 @@ externa está completa:
   polling do frontend a chegar quase ao mesmo tempo — podiam ambas passar a verificação antes
   de qualquer uma escrever, duplicando o email/push de confirmação). `Payment.reference`
   (já `unique=True`) serve de dedupe key — não foi preciso campo novo.
-- Testes que **provam a falha atual** (`api/tests/test_payment_security_gaps.py`): o callback
-  público confirma sem qualquer verificação, e `check_payment_status` confirma `pinpay` sem
-  contactar a ifthenpay. Passam hoje **porque a falha existe** — não são `xfail` — e servem de
-  critério de aceitação explícito para quando cada uma for corrigida.
+- Testes que **provavam a falha atual** (`api/tests/test_payment_security_gaps.py`): o
+  callback público confirma sem qualquer verificação (continua a provar isto — falha #1 ainda
+  aberta), e `check_payment_status` confirmava `pinpay` sem contactar a ifthenpay (falha #2 —
+  **corrigida a seguir, 2026-08-18, ver acima**; o teste passou a provar a correção).
 
-97/97 testes, `makemigrations --check --dry-run` limpo. **Nada disto muda a fonte da
-confirmação de pagamento hoje** — as duas falhas continuam abertas e exploráveis; só ficou
-mais fácil de auditar e mais seguro sob concorrência.
+97/97 testes nesta etapa (112/112 depois da correção da falha #2, ver acima). **Falha #1
+(callback público) continua aberta e exploráveis** — depende de configuração externa
+(assinatura EuPago 2.0 / callback ifthenpay verificado platform-wide) para fechar
+definitivamente. Falha #2 fechada.
 
-Falta a parte que precisa de ação do utilizador (tabela acima) — ver "Correções" no topo
-deste documento.
+Falta a parte que precisa de ação do utilizador para a falha #1 (tabela acima) — ver
+"Correções" no topo deste documento.
 
 ## Reversão
 

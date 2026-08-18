@@ -5,6 +5,12 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
+- **2026-08-18 — antes do deploy para produção, falha crítica ativa encontrada e corrigida**:
+  `reconcile_pending_payments` (job de produção, 5 em 5 min, presente desde sempre) confirmava
+  cegamente qualquer pagamento `pinpay` pendente há >15 min, pago ou não — já em produção,
+  não introduzido por esta migração. Corrigido: `check_payment_status` já não confirma
+  `pinpay` sozinho, só o webhook `/api/webhooks/ifthenpay/` (já validado ao vivo) pode. Ver a
+  entrada completa mais abaixo e `docs/migration/04-bookwey-security.md`.
 - **2026-08-18 — `weypay-sdk` publicado**: repositório público em
   `github.com/vectorassumido/weypay-sdk`, tag `v0.1.0`. O quase-incidente de credenciais no
   histórico (Fase 0a, ficheiro `docs/LOCAL-TESTING.md`) foi resolvido primeiro —
@@ -72,14 +78,18 @@ concluído (mais recente no topo), mais o estado corrente.
   (noutro dispositivo). Resultado, **sem nenhuma chamada manual**: `GatewayCallLog(outcome=
   "paid", http_status=200)`, `Payment.status` passou a `"confirmed"` sozinho — primeira
   confirmação PINPAY do `bookwey` verificada de facto contra a ifthenpay, não pelo caminho
-  inseguro. **Decisão explícita, não executada**: não remover ainda o ramo `pinpay` de
-  `check_payment_status` — o callback registado aponta para o túnel temporário, que já não
-  existe (parado no fim do teste), e nada disto foi para produção ainda (a rota não existe lá).
-  Sequência correta antes de remover o fallback: deploy desta branch → migrations em produção
-  → `ifthenpay_callback_key` no merchant real → trocar o URL no backoffice ifthenpay para o
-  domínio de produção → confirmar com um pagamento real → só então remover o fallback. Ver
-  `docs/migration/04-bookwey-security.md`. Ambiente local reposto (`minimum_payment_amount`
-  de volta a 5.00, servidor e túnel parados).
+  inseguro. Ambiente local reposto (`minimum_payment_amount` de volta a 5.00, servidor e túnel
+  parados).
+- **2026-08-18 — decisão revertida: o fallback foi removido já, não ficou para depois do
+  deploy** (`bookwey` commit `e253ec2`). Motivo: ao confirmar com o utilizador se era seguro
+  avançar para produção, descoberto que `reconcile_pending_payments` (job a cada 5 min, em
+  produção desde o "Initial commit" — não introduzido por esta migração) confirmava cegamente
+  qualquer `pinpay` pendente há mais de 15 min, pago ou não — falha ativa, não hipotética,
+  confirmada lendo `main` diretamente. Gravidade suficiente para corrigir imediatamente em vez
+  de esperar pela sequência completa de deploy. `check_payment_status` para `pinpay` já não
+  confirma nada sozinho — só reflete o que o webhook já confirmou. 2 testes de regressão
+  substituem o que provava a falha. 112/112 testes. Ver
+  `docs/migration/04-bookwey-security.md`.
 - **2026-08-18 — PINPAY (Apple Pay + Google Pay) validado com credenciais de produção reais
   do utilizador** (`ifthenpay_gateway_key`/`apple_key`/`google_key` configuradas por ele no
   admin — nunca lidas nem impressas por mim, só booleanos "set: True/False" verificados).

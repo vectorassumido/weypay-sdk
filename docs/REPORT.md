@@ -334,12 +334,22 @@ real de €0,01 via Apple Pay confirmado automaticamente, sem nenhuma chamada ma
 `GatewayCallLog(outcome="paid", http_status=200)`, `Payment.status="confirmed"`. Primeira
 confirmação PINPAY do `bookwey` verificada de facto contra a ifthenpay.
 
-**Decisão explícita, não executada**: o ramo inseguro de `check_payment_status` (falha 2 das
-duas conhecidas) não foi removido — o callback testado apontava para o túnel temporário, e
-nada disto tinha ainda ido para produção. Sequência acordada antes de remover: deploy da
-branch → migrations em produção → `ifthenpay_callback_key` no merchant real → trocar o URL no
-backoffice ifthenpay para o domínio de produção → confirmar com um pagamento real → só então
-remover o fallback.
+**Decisão revertida — corrigido de imediato, não ficou para depois do deploy.** Ao confirmar
+com o utilizador se era seguro avançar para produção com ambos os projetos, descoberta uma
+falha crítica **ativa em produção neste momento**, não relacionada com nenhum trabalho desta
+migração: `reconcile_pending_payments` (job agendado a cada 5 min, presente desde o "Initial
+commit" do `bookwey`) chama `check_payment_status()` para todo o pagamento `pending` há mais
+de 15 min — e para `pinpay`, essa função confirmava sem verificar nada, sempre. Combinado:
+**qualquer marcação com pagamento PINPAY pendente é automaticamente marcada como paga ao fim
+de ~15-20 min em produção, com ou sem pagamento real** — confirmado lendo o código de `main`
+diretamente, não por dedução.
+
+Corrigido de imediato (`bookwey` commit `e253ec2`): `check_payment_status` para `pinpay`
+deixa de confirmar seja o que for — a confirmação passa a ser exclusiva do webhook verificado
+(já provado a funcionar ao vivo, ver acima). 2 testes de regressão substituem o que provava a
+falha. 112/112 testes. A outra falha conhecida (`GET /api/pagamento-callback/<uuid>/` público,
+sem autenticação) continua aberta — depende de configuração externa (Webhooks 2.0 EuPago,
+platform-wide) para fechar.
 
 ### Publicação do `weypay-sdk`
 
@@ -362,7 +372,7 @@ publicada. `boxwey-serverless` e `bookwey-serverless` passam a fixar `weypay` no
 |---|---|
 | `weypay-sdk` | Público, `github.com/vectorassumido/weypay-sdk`, tag `v0.1.0`. 114 testes, gates verdes. |
 | `boxwey-serverless` | Branch `weypay-sdk-migration`, `requirements.txt` fixado à tag. 209/209 testes. |
-| `bookwey-serverless` | Branch `weypay-sdk-migration`, webhook PINPAY implementado e validado ao vivo, `requirements.txt` fixado à tag. 111/111 testes. |
+| `bookwey-serverless` | Branch `weypay-sdk-migration`, webhook PINPAY implementado e validado ao vivo, fallback inseguro removido, `requirements.txt` fixado à tag. 112/112 testes. |
 
 ### Por fazer, para quando o utilizador quiser avançar
 

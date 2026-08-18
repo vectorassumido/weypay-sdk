@@ -462,3 +462,117 @@ utilizador, não corrigido — fora do âmbito desta sessão.
   ou ler a documentação nova partilhada pelo utilizador.
 - `ScheduledService` sem `TenantManager` — corrigir quando o utilizador quiser.
 - SIBS (Fase 5): continua bloqueada por falta de contrato/credenciais.
+
+---
+
+## Adendo 4 — sessão autónoma, utilizador ausente (2026-08-19)
+
+O utilizador saiu depois do Adendo 3, com instruções explícitas: continuar em modo `/loop`,
+sem disparar nenhum pagamento real (não podia reagir no telemóvel) e sem fazer deploy de nada
+(a ida a produção fica para ele autorizar pessoalmente). Duas tarefas explícitas — corrigir o
+bug real em `_has_slot_conflict()` e investigar os dois URLs de documentação ifthenpay que
+tinha partilhado — mais permissão aberta para avançar mais, dentro dessas restrições. A skill
+`weypay-phase` ganhou as restrições 11-13 para esta sessão (sem pagamentos reais, sem deploy,
+sem `git push` do SDK sem supervisão) antes de o loop começar.
+
+### 1. `_has_slot_conflict()` corrigido
+
+`ScheduledService.objects.all_tenants()` nunca existiu: `TenantManager` (`core/managers.py`)
+só suporta modelos com FK direta a `merchant`, e `ScheduledService` só chega lá indiretamente
+via `schedule` — por isso usa o `Manager` simples do Django, sem `.all_tenants()`. O guard só
+é acionado quando `schedule.payment_deadline` já passou (confirmação tardia), e crashava
+sempre com `AttributeError` nesse caso. Confirmado pré-existente em `main` (`git show
+main:...`), não introduzido pela migração. Corrigido removendo a chamada — o `Manager`
+simples já devolve tudo sem filtro (o que `.all_tenants()` pretendia fazer), e o filtro
+`employee=` já restringe corretamente ao merchant certo na prática. Três testes de regressão
+novos (`test_slot_conflict_guard.py`): confirmação tardia sem conflito não crasha, confirmação
+tardia com conflito real falha o pagamento, e a marcação nunca conflita consigo própria.
+`bookwey` commit `0a55f6d` na branch `weypay-sdk-migration`.
+
+Efeito colateral encontrado ao correr a suite completa (disciplina estabelecida: nunca só o
+ficheiro de teste diretamente relevante): `test_eupago_webhook.py::_body()` ainda usava o
+nome de campo antigo (`"transactions"`, plural) que o `v0.2.1` do SDK já não reconhece —
+regressão silenciosa de um commit anterior desta mesma sessão, nunca antes exposta porque o
+bump de versão do SDK não tinha disparado uma corrida completa da suite na altura. Corrigido
+(`1f3b5b0`). Contagem final: 132/132 antes desta fase.
+
+### 2. Investigação ifthenpay — mecanismo de reconciliação encontrado, mas bloqueado
+
+Os dois URLs partilhados pelo utilizador (`ifthenpay.com/docs/en/api/list-of-payments-rest/`
+e `.../api/pbl/`) são SPAs em React — o `WebFetch` só via cabeçalhos/navegação. Contornado
+lendo o HTML bruto via `curl` e procurando referências a ficheiros `.json`/`.yaml`
+embutidos: ambas as páginas referenciam um `openapi.yaml` estático, obtido diretamente.
+
+**Achado real**: `POST https://api.ifthenpay.com/v2/payments/read` ("List of Payments REST"),
+que a própria ifthenpay descreve como *"an alternative or complement to the callback
+(webhook)"* — exatamente o que se procurava. Cobre a conta inteira (`MB`/`MBWAY`/`PAYSHOP`/
+`CCARD`/`COFIDIS`/`GOOGLE`/`APPLE`/`PIX`/`TPA`, incluindo as contas `GOOGLE`/`APPLE` que o
+PINPAY usa), e `orderId` corresponde exatamente ao `id` que `create_payment` já envia. A
+resposta só lista pagamentos **concluídos** — sem campo de estado por pagamento, a própria
+presença do `orderId` pedido já significa pago.
+
+**Bloqueio real, não contornável sem o utilizador**: requer `boKey` — "key provided by
+ifthenpay when signing the contract" / "Backoffice key that identifies the merchant account".
+É uma credencial **distinta** da `gateway_key` (cria o pagamento PINPAY) e da chave
+anti-phishing (valida o callback), e não está guardada em lado nenhum do código nem foi
+mencionada em nenhuma sessão anterior — possivelmente o campo "Chave de Backoffice" visto
+mascarado no modal "Ativação de Callback" do backoffice ifthenpay, nunca preenchido nem lido.
+Por regra (nunca ler/transportar credenciais), não foi procurado em `.env` nem adivinhado.
+
+Implementado e testado na mesma: `weypay.providers.ifthenpay.pinpay.get_order_status()`
+(SDK `v0.3.0`, tag local criada, **não publicada** — ver "Estado dos repositórios" abaixo),
+com fixtures a partir do schema documentado, mesmo padrão usado no resto do SDK antes de
+qualquer validação real. No `bookwey`, campo aditivo `Merchant.ifthenpay_bo_key` (em branco
+por omissão, migration `0006`) e `check_payment_status` passa a chamar o fallback só quando
+o campo estiver preenchido — com todos os merchants reais em branco hoje, **o comportamento
+fica idêntico** ao que ficou no Adendo 3 (confirmação exclusiva do webhook verificado). Quatro
+testes novos cobrem: confirma quando o fallback diz PAID, mantém-se pendente quando diz
+PENDING, mantém-se pendente se a chamada ao gateway falhar, e nunca chama o fallback com o
+campo vazio. `bookwey` commit `fd0d7bb` na branch `weypay-sdk-migration`. 136/136 testes.
+
+O segundo URL (`.../api/pbl/`) revelou também que a **ativação do callback tem uma API
+própria** (`POST /callback/activation`, exige `boKey`+`gatewayKey`+`apKey`+`urlCb`) — não
+usada, porque o callback do PINPAY já tinha sido registado manualmente no backoffice no
+Adendo 3; fica documentado como alternativa para o futuro (evitaria repetir o processo manual
+por-conta ao adicionar merchants novos, uma vez obtido o `boKey`).
+
+Ver `docs/OPEN-QUESTIONS.md` #23 (resolvida) e #26 (nova, o bloqueio do `boKey`),
+`docs/providers/ifthenpay-pinpay.md` (j).
+
+### 3. Nada mais avançado sem supervisão
+
+Reavaliado o resto do `docs/OPEN-QUESTIONS.md` no fim desta fase: todos os itens restantes
+exigem ou acesso ao backoffice do utilizador (item 9), ou um pagamento real (item 8, fora de
+questão nesta sessão), ou são SIBS/Fase 5 (bloqueada por falta de contrato — fora do âmbito
+autónomo mesmo com o utilizador presente). Nada mais ficou identificado como seguro e
+avançável dentro das restrições desta sessão.
+
+### Estado dos repositórios ao fim desta fase
+
+| Repositório | Estado |
+|---|---|
+| `weypay-sdk` | `main`, tag local `v0.3.0` criada mas **não publicada** (restrição 13 — evitar `git push` sem supervisão; o utilizador não pediu explicitamente nada que o exigisse). 141 testes, gates verdes (`ruff`, `mypy --strict`, `pytest`). |
+| `boxwey-serverless` | Branch `weypay-sdk-migration`, inalterado nesta fase. |
+| `bookwey-serverless` | Branch `weypay-sdk-migration`, commits `0a55f6d`/`1f3b5b0`/`fd0d7bb` — nenhum em `main`, nenhum `push`. 136/136 testes. `requirements.txt` continua fixado a `weypay@v0.2.1` (deliberado: `v0.3.0` não está publicado, apontar para ele quebraria uma instalação real). |
+
+### Três lembretes obrigatórios ao utilizador, ao regressar
+
+1. **Repor os dados de teste no admin em local** — mencionado explicitamente antes de sair.
+2. **Configurar no Webhooks 2.0 da EuPago o URL de produção correto** (`api.bookwey.com`), a
+   substituir o túnel `cloudflared` temporário usado para validar no Adendo 3.
+3. **Decidir sobre o `boKey` da ifthenpay** (novo, item 26): confirmar se existe, obtê-lo
+   junto da ifthenpay/backoffice, e colá-lo em `Merchant.ifthenpay_bo_key` no admin — assim
+   que estiver lá, o fallback de reconciliação PINPAY liga-se sozinho, sem mais código.
+
+### Por fazer (acumulado, substitui a lista do Adendo 3)
+
+- Deploy de `bookwey-serverless`, seguido de: migrations em produção →
+  `eupago_webhook_signing_key`/`ifthenpay_callback_key`/`ifthenpay_bo_key` (se obtido) nos
+  merchants reais → trocar URLs de callback dos túneis temporários para os domínios reais →
+  confirmar com pagamentos reais.
+- Rever e, só depois, publicar a tag `v0.3.0` do SDK (`git push` + `git push --tags`), e
+  atualizar `requirements.txt` de ambos os consumidores para a apontar.
+- Rever e mergear (ou não) a branch `weypay-sdk-migration` em `main`, em ambos os consumidores
+  — decisão do utilizador, nunca tomada autonomamente.
+- Obter o `boKey` ifthenpay (item 26) para ativar o fallback de reconciliação PINPAY.
+- SIBS (Fase 5): continua bloqueada por falta de contrato/credenciais.

@@ -5,6 +5,21 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
+- **2026-08-19 — sessão autónoma concluída, loop parado.** As duas tarefas explícitas ficaram
+  feitas: `_has_slot_conflict()` corrigido (`bookwey` commit `0a55f6d`) e os dois URLs
+  ifthenpay investigados até ao fim — encontrado `ifthenpay.pinpay.get_order_status()`
+  (SDK `v0.3.0`, tag local, **não publicada**), a API "List of Payments REST" que a própria
+  ifthenpay documenta como alternativa ao callback, cobrindo `orderId` = `id` do PINPAY.
+  Implementado, testado, e ligado no `bookwey` condicionalmente a
+  `Merchant.ifthenpay_bo_key` (campo aditivo, em branco por omissão — sem regressão em
+  nenhum merchant real hoje). **Bloqueio real, não contornável**: o `boKey` em si não está
+  disponível em lado nenhum — ver `docs/OPEN-QUESTIONS.md` #26. Nada mais identificado como
+  seguro e avançável sem o utilizador (resto de `OPEN-QUESTIONS.md` exige backoffice,
+  pagamento real, ou é SIBS/Fase 5). `weypay-sdk` 141/141, `bookwey` 136/136, ambos os
+  gates verdes. Relatório completo em `docs/REPORT.md` Adendo 4, com os 3 lembretes ao
+  utilizador (dados de teste local, URL de produção no Webhooks 2.0 EuPago, decisão sobre o
+  `boKey`).
+
 - **2026-08-19 — sessão autónoma iniciada, utilizador ausente.** Objetivo: deixar `bookwey-
   serverless` e `boxwey-serverless` prontos para ir a produção com o `weypay-sdk`, sem
   disparar nenhum pagamento real (o utilizador não pode reagir no telemóvel) e sem fazer

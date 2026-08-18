@@ -53,6 +53,21 @@ concluído (mais recente no topo), mais o estado corrente.
   - **Falta**: uma URL alcançável para registar nas contas `APPLE`/`GOOGLE` (túnel ou deploy
     real) e escolher a chave anti-phishing a colar em ambos os lados. EuPago 2.0 fica para
     depois (mesmo padrão: escrever `providers/eupago/callback.py` no SDK primeiro).
+- **2026-08-18 — webhook PINPAY confirmado a funcionar de ponta a ponta com um pagamento
+  real**: túnel `cloudflared` efémero (binário isolado no scratchpad, removido no fim — nada
+  instalado no sistema) a expor `localhost:8000`, callback registado nas contas `APPLE`/
+  `GOOGLE` com uma chave anti-phishing gerada localmente. Pagamento de €0,01 via Apple Pay
+  (noutro dispositivo). Resultado, **sem nenhuma chamada manual**: `GatewayCallLog(outcome=
+  "paid", http_status=200)`, `Payment.status` passou a `"confirmed"` sozinho — primeira
+  confirmação PINPAY do `bookwey` verificada de facto contra a ifthenpay, não pelo caminho
+  inseguro. **Decisão explícita, não executada**: não remover ainda o ramo `pinpay` de
+  `check_payment_status` — o callback registado aponta para o túnel temporário, que já não
+  existe (parado no fim do teste), e nada disto foi para produção ainda (a rota não existe lá).
+  Sequência correta antes de remover o fallback: deploy desta branch → migrations em produção
+  → `ifthenpay_callback_key` no merchant real → trocar o URL no backoffice ifthenpay para o
+  domínio de produção → confirmar com um pagamento real → só então remover o fallback. Ver
+  `docs/migration/04-bookwey-security.md`. Ambiente local reposto (`minimum_payment_amount`
+  de volta a 5.00, servidor e túnel parados).
 - **2026-08-18 — PINPAY (Apple Pay + Google Pay) validado com credenciais de produção reais
   do utilizador** (`ifthenpay_gateway_key`/`apple_key`/`google_key` configuradas por ele no
   admin — nunca lidas nem impressas por mim, só booleanos "set: True/False" verificados).

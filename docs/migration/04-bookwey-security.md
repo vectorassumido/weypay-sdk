@@ -14,11 +14,15 @@ configuração nos backoffices dos gateways, que só o utilizador pode fazer.
    `pinpay` sem contactar a ifthenpay; a referência (`str(schedule.id.int)[-15:]`) é
    devolvida ao browser.
 
-   ⚠️ **Continua aberta de propósito** (2026-08-18): o webhook `/api/webhooks/ifthenpay/` já
-   existe (ver Correções abaixo), mas removê-la agora — antes de o callback estar registado e
-   testado ao vivo no backoffice ifthenpay — deixaria o PINPAY sem NENHUMA forma de confirmar
-   localmente. Ordem correta: registar o callback → confirmar que funciona de ponta a ponta →
-   só então remover este ramo. Não inverter a ordem.
+   ✅ **Webhook registado e confirmado a funcionar de ponta a ponta (2026-08-18)**: callback
+   registado nas contas `APPLE`/`GOOGLE` do backoffice ifthenpay, apontando para
+   `http://localhost:8000` via túnel `cloudflared` efémero. Pagamento real de €0,01 via Apple
+   Pay (noutro dispositivo — a falha de redirecionamento local não interessa aqui, o webhook é
+   servidor-a-servidor, não depende do browser do comprador). Resultado observado, sem
+   nenhuma chamada manual: `GatewayCallLog(outcome="paid", http_status=200,
+   request={'referencia': '199928337085928', 'valor': '0.01', 'estado': 'PAGO'})`,
+   `Payment.status` passou a `"confirmed"` sozinho. **Esta é agora a ordem cumprida**: registar
+   → confirmar ao vivo → o ramo `pinpay` de `check_payment_status` pode ser removido a seguir.
 
 ## Correções, cada uma dependente de uma ação do utilizador primeiro
 

@@ -5,6 +5,19 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
+- **2026-08-19 — sessão autónoma iniciada, utilizador ausente.** Objetivo: deixar `bookwey-
+  serverless` e `boxwey-serverless` prontos para ir a produção com o `weypay-sdk`, sem
+  disparar nenhum pagamento real (o utilizador não pode reagir no telemóvel) e sem fazer
+  deploy de nada (ele autoriza a ida a produção pessoalmente, mais tarde). Ver skill
+  `weypay-phase` restrições 11-13 (novas, só para esta sessão). Tarefas pedidas
+  explicitamente: (1) corrigir `_has_slot_conflict()`/`ScheduledService` sem `TenantManager`
+  — bug real, pré-existente, crasha em confirmações tardias; (2) investigar
+  `ifthenpay.com/docs/en/api/list-of-payments-rest/` e `.../api/pbl/` para uma forma de
+  verificar pagamentos PINPAY sem depender do callback; (3) o que mais der para avançar em
+  segurança dentro das restrições acima. **Lembretes para o utilizador, no relatório final**:
+  repor os dados de teste no admin local; configurar no Webhooks 2.0 da EuPago o URL de
+  produção correto (`api.bookwey.com`), a substituir o túnel temporário.
+
 - **2026-08-19 — webhook EuPago 2.0 validado de ponta a ponta em produção real, com um bug
   real encontrado e corrigido** (SDK tag `v0.2.1`, `bookwey` commits `1e22316`/`46280dc`).
   Canal configurado no backoffice EuPago (conta de produção real, separada da sandbox), túnel

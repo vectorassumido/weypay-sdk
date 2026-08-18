@@ -24,8 +24,17 @@ concluído (mais recente no topo), mais o estado corrente.
   `bookwey`'s `development.py` (precisa de fixtures reais — já existem, ver abaixo — mas
   `FakeResponseRegistry` só regista uma resposta por `(method, url)`, não dá para pré-carregar
   vários desfechos do mesmo endpoint sem alargar o desenho; decisão a confirmar com o
-  utilizador), Fase 4 (segurança `bookwey`) e Fase 5 (SIBS) por inteiro, PINPAY/Apple Pay no
-  `bookwey` (utilizador precisa de pedir conta de teste à ifthenpay primeiro).
+  utilizador), Fase 4 — só a parte que precisa de ação do utilizador nos backoffices (a parte
+  sem dependência externa está feita, ver abaixo) — e Fase 5 (SIBS) por inteiro.
+- **2026-08-18 — Fase 4, subconjunto seguro concluído** (`bookwey` commit `37bca3a`):
+  `GatewayCallLog` (cópia do `boxwey`, escrito na iniciação de split/EuroPix/PinPay),
+  `select_for_update()` em `pay_pagamento()` (fecha condição de corrida real — duas
+  confirmações concorrentes podiam duplicar o email/push), e testes que **provam** (não
+  hipotetizam) as duas falhas: callback público confirma sem verificação, `pinpay` confirma
+  sem contactar a ifthenpay. 97/97 testes. **Nada disto muda a fonte da confirmação hoje** —
+  as duas falhas continuam abertas, só ficaram mais fáceis de auditar/corrigir depois. Falta a
+  parte que precisa de ação do utilizador (canal EuPago 2.0, callback PINPAY no backoffice —
+  agora possível, há credenciais reais). Ver `docs/migration/04-bookwey-security.md`.
 - **2026-08-18 — PINPAY (Apple Pay + Google Pay) validado com credenciais de produção reais
   do utilizador** (`ifthenpay_gateway_key`/`apple_key`/`google_key` configuradas por ele no
   admin — nunca lidas nem impressas por mim, só booleanos "set: True/False" verificados).

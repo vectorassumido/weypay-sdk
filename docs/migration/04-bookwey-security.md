@@ -37,16 +37,34 @@ produção, não só de testes verdes.
 
 ## O que a execução autónoma pode preparar sem decidir por ninguém
 
-- `GatewayCallLog` no `bookwey` (cópia de `02`).
-- `select_for_update` + unique index de dedupe na tabela `Payment` — não muda a *fonte* da
-  confirmação, só torna a aplicação de qualquer confirmação (correta ou não) atómica.
-- Os testes que **provam a falha atual** (callback confirma sem verificação; `pinpay` confirma
-  sem contactar a ifthenpay) — escritos como testes que hoje **falham** (`xfail` ou
-  explicitamente marcados como demonstração da falha), para servirem de critério de aceitação
-  claro quando a correção for aplicada.
+✅ **Feito (2026-08-18, `bookwey-serverless` commit `37bca3a`)** — a parte sem dependência
+externa está completa:
 
-Se a execução autónoma chegar aqui com tempo/orçamento sobrando, fazer só o acima e parar —
-nunca a parte que exige configuração externa.
+- `GatewayCallLog` no `bookwey` (`integrations/payments/models.py`, cópia exata do modelo de
+  `02`) — escrito na iniciação de `criar_pagamento_com_split`/`_europix`/`_pinpay`
+  (`_log_call()`, tanto no sucesso como em `GatewayRejected`). **Não** escrito em
+  `verificar_pagamento`/`verificar_pagamento_mbway` (consulta de estado) — `weypay.providers.
+  eupago.status.get_reference_status()` não expõe `GatewayCall` no caminho de sucesso (só
+  `data`), ao contrário dos providers de criação (`PaymentResult.call`). Alargar isso é uma
+  mudança de desenho do SDK, não uma tarefa mecânica — ficou por fazer de propósito, registado
+  como item de backlog, não escondido.
+- `select_for_update()` em `pay_pagamento()` — toda a secção crítica (verificação de status →
+  confirmação) passa a correr dentro de `transaction.atomic()` com o `Payment` bloqueado,
+  fechando uma condição de corrida real (duas confirmações concorrentes — ex.: webhook e
+  polling do frontend a chegar quase ao mesmo tempo — podiam ambas passar a verificação antes
+  de qualquer uma escrever, duplicando o email/push de confirmação). `Payment.reference`
+  (já `unique=True`) serve de dedupe key — não foi preciso campo novo.
+- Testes que **provam a falha atual** (`api/tests/test_payment_security_gaps.py`): o callback
+  público confirma sem qualquer verificação, e `check_payment_status` confirma `pinpay` sem
+  contactar a ifthenpay. Passam hoje **porque a falha existe** — não são `xfail` — e servem de
+  critério de aceitação explícito para quando cada uma for corrigida.
+
+97/97 testes, `makemigrations --check --dry-run` limpo. **Nada disto muda a fonte da
+confirmação de pagamento hoje** — as duas falhas continuam abertas e exploráveis; só ficou
+mais fácil de auditar e mais seguro sob concorrência.
+
+Falta a parte que precisa de ação do utilizador (tabela acima) — ver "Correções" no topo
+deste documento.
 
 ## Reversão
 

@@ -39,6 +39,21 @@ STATUS_MAP: dict[str, PaymentStatus] = {
 }
 
 
+def extract_reference(body: bytes) -> str:
+    """Extrai só a referência, sem verificar a assinatura — antes de se saber a chave
+    esperada, que é por-merchant e só se sabe depois de resolver o merchant a partir desta
+    referência (mesmo problema, e mesma solução, do `ifthenpay.callback.extract_reference`).
+    Seguro: nada aqui é tratado como verificado — só serve para escolher a chave, e a
+    verificação real acontece a seguir em `verify_and_parse`. Um pedido forjado com uma
+    referência de outro merchant continua a falhar aí, porque a assinatura não bate certo com
+    a chave desse merchant."""
+    transaction = _parse_transactions(body)
+    reference = str(transaction.get("reference", "") or "")
+    if not reference:
+        raise WebhookVerificationError("'transactions.reference' em falta ou vazio")
+    return reference
+
+
 def verify_signature(*, body: bytes, signature: str, key: str) -> None:
     """Verifica o header ``X-Signature`` — HMAC-SHA256 sobre o corpo bruto (bytes, tal como
     recebido, antes de qualquer parsing), comparado em tempo constante contra o valor
@@ -63,15 +78,7 @@ def verify_and_parse(*, body: bytes, signature: str, key: str) -> WebhookEvent:
     devolve um evento a partir de um pedido não verificado."""
     verify_signature(body=body, signature=signature, key=key)
 
-    try:
-        data: dict[str, Any] = json.loads(body)
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise WebhookVerificationError(f"corpo não é JSON válido: {exc}") from exc
-
-    transaction = data.get("transactions")
-    if not isinstance(transaction, dict):
-        raise WebhookVerificationError("corpo sem campo 'transactions'")
-
+    transaction = _parse_transactions(body)
     reference = str(transaction.get("reference", "") or "")
     if not reference:
         raise WebhookVerificationError("'transactions.reference' em falta ou vazio")
@@ -87,9 +94,21 @@ def verify_and_parse(*, body: bytes, signature: str, key: str) -> WebhookEvent:
         status=status,
         raw_status=raw_status,
         dedupe_key=f"eupago:{reference}:{raw_status}:{transaction.get('trid', '')}",
-        payload=data,
+        payload=json.loads(body),
         amount=amount,
     )
+
+
+def _parse_transactions(body: bytes) -> dict[str, Any]:
+    try:
+        data: dict[str, Any] = json.loads(body)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise WebhookVerificationError(f"corpo não é JSON válido: {exc}") from exc
+
+    transaction = data.get("transactions")
+    if not isinstance(transaction, dict):
+        raise WebhookVerificationError("corpo sem campo 'transactions'")
+    return transaction
 
 
 def _parse_amount(amount_data: object) -> Money | None:

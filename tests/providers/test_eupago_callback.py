@@ -19,7 +19,7 @@ from hashlib import sha256
 import pytest
 
 from weypay.errors import WebhookVerificationError
-from weypay.providers.eupago.callback import verify_and_parse, verify_signature
+from weypay.providers.eupago.callback import extract_reference, verify_and_parse, verify_signature
 from weypay.types import PaymentStatus
 
 KEY = "chave-de-encriptacao-do-backoffice"
@@ -44,6 +44,25 @@ def _body(**overrides: object) -> bytes:
     }
     transaction.update(overrides)
     return json.dumps({"transactions": transaction, "channel": {"name": "VECTORASSUMIDO"}}).encode()
+
+
+# --- extract_reference (não verificada — só para escolher a chave por-merchant) ----------
+
+
+def test_extract_reference_works_without_a_valid_signature() -> None:
+    """Deliberado: a app precisa da referência para saber que merchant/chave usar antes de
+    poder verificar a assinatura — mesmo problema e mesma solução do ifthenpay."""
+    assert extract_reference(_body(reference="320780")) == "320780"
+
+
+def test_extract_reference_missing_raises() -> None:
+    with pytest.raises(WebhookVerificationError, match="reference"):
+        extract_reference(_body(reference=""))
+
+
+def test_extract_reference_non_json_raises() -> None:
+    with pytest.raises(WebhookVerificationError, match="JSON"):
+        extract_reference(b"not json")
 
 
 # --- verify_signature ------------------------------------------------------------------

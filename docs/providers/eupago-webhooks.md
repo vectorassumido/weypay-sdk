@@ -76,6 +76,29 @@ verificável de facto (não inferida), estados de reembolso/cancelamento/expira�
 com backoff em vez de "melhor esforço". Até lá, `chave_api` do 1.0 é melhor do que nada —
 está hoje completamente por verificar.
 
+## Implementado (2026-08-18)
+
+✅ `weypay/providers/eupago/callback.py::verify_and_parse()` — assinatura `X-Signature`
+verificada **antes** de qualquer parsing do corpo (um corpo malformado com assinatura errada
+falha por causa da assinatura, nunca revela se "parece" JSON válido). Cifra opcional
+(`encrypt=true`, AES-256-CBC) **não implementada** — decisão deliberada, ver docstring do
+módulo: a assinatura já garante integridade/autenticidade, cifrar é sobre confidencialidade
+em trânsito, redundante com HTTPS (anti-overengineering, `docs/PLAN.md`).
+
+**Vocabulário mapeado**: `Paid`→`PAID`, `Refund`→`REFUNDED`, `Cancel`→`DECLINED`,
+`Expired`→`EXPIRED`. `Error` fica deliberadamente `UNKNOWN` — a documentação não esclarece se
+é falha definitiva do pagamento ou um erro transitório do lado da EuPago; nunca assumir sem
+observar um `Error` real primeiro (regra 6, docs/SECURITY.md).
+
+⚠️ **Não confirmado por um payload real** — os testes (`tests/providers/
+test_eupago_callback.py`, 19 testes) usam o exemplo *verbatim* da documentação oficial para o
+corpo, e o algoritmo HMAC documentado para a assinatura (esse é protocolo verificável
+independentemente de um payload real observado). Falta: configurar o canal Webhooks 2.0 no
+backoffice, gerar a chave criptográfica, e receber um pagamento real para confirmar a forma
+exata do corpo e o vocabulário de `status` contra a realidade — mesma disciplina aplicada ao
+MB WAY (`EstadoPedidosJSON` só ficou correto depois de uma chamada real corrigir três pontos
+que a documentação tinha errados).
+
 ## Fonte
 
 [Webhooks 1.0](https://eupago.readme.io/reference/webhooks) ·

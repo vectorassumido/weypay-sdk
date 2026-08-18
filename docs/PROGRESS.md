@@ -5,6 +5,24 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
+- **2026-08-19 — webhook EuPago 2.0 validado de ponta a ponta em produção real, com um bug
+  real encontrado e corrigido** (SDK tag `v0.2.1`, `bookwey` commits `1e22316`/`46280dc`).
+  Canal configurado no backoffice EuPago (conta de produção real, separada da sandbox), túnel
+  `cloudflared` efémero, 3 pagamentos MB WAY reais (€1,00 — €0,01 e €0,50 rejeitados pela
+  EuPago com `AMOUNT_INVALID`, mínimo real de produção fica entre os dois). A EuPago tentou
+  entregar o webhook 3 vezes e falhou sempre — a causa só ficou visível depois de corrigir o
+  código para guardar o corpo bruto em falhas de parsing (antes só um `logger.warning()`
+  sem persistência). Corpo real capturado revelou um erro genuíno na documentação: o campo
+  principal chama-se `transaction` (singular), não `transactions` (plural) — mesma categoria
+  do bug do `EstadoPedidosJSON`. Corrigido, reenviado o payload real capturado com uma
+  assinatura calculada corretamente, confirmado `Payment.status="confirmed"` sem qualquer
+  chamada manual adicional. Ver `docs/observed/eupago_webhook_paid.json`,
+  `docs/providers/eupago-webhooks.md`, `docs/OPEN-QUESTIONS.md` #25 (resolvida).
+  **Descoberta lateral, não corrigida**: `_has_slot_conflict()` em `bookwey` chama
+  `ScheduledService.objects.all_tenants()`, mas esse modelo não tem `TenantManager` — falha
+  com `AttributeError` sempre que uma confirmação tardia (depois do `payment_deadline`) a
+  aciona. Confirmado pré-existente em `main`, não introduzido por esta migração — reportado
+  ao utilizador, não corrigido (fora do âmbito desta sessão).
 - **2026-08-18 — Fase 4 completa: as duas falhas de segurança conhecidas estão corrigidas.**
   Falha #1 (`GET /api/pagamento-callback/<uuid>/`, confirmava sem verificar nada) removida
   por completo (`bookwey` commit `064101e`) — sem caller legítimo, confirmado por grep

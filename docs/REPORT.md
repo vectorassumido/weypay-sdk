@@ -382,3 +382,83 @@ publicada. `boxwey-serverless` e `bookwey-serverless` passam a fixar `weypay` no
   `providers/eupago/callback.py` no SDK (nunca feito) antes de haver algo para configurar.
 - SIBS (Fase 5): continua bloqueada por falta de contrato/credenciais.
 - `Environment.FAKE` default: decisão de desenho pendente sobre o `FakeResponseRegistry`.
+
+---
+
+## Adendo 3 — Fase 4 completa: EuPago Webhooks 2.0 e fecho das duas falhas (2026-08-18/19)
+
+Continuação direta do Adendo 2, mesma sessão, a pedido explícito do utilizador ("vamos
+corrigir a falha que continua aberta, vamos tratar da fase 4 completa e configurar já o
+webhook 2.0 da eupago").
+
+### As duas falhas de segurança, agora ambas corrigidas
+
+1. **PINPAY (`check_payment_status` confirmava sem verificar)** — corrigida primeiro,
+   depois de descobrir que `reconcile_pending_payments` (job de produção, 5 em 5 min, desde
+   sempre) confirmava cegamente qualquer `pinpay` pendente há mais de 15 minutos, pago ou
+   não. Falha ativa, não hipotética, confirmada lendo `main` diretamente.
+2. **Callback público (`GET /api/pagamento-callback/<uuid>/`)** — removido por completo
+   (não "consertado"), sem caller legítimo (grep sistemático antes de tocar).
+
+### `providers/eupago/callback.py` escrito no SDK — nunca tinha sido feito
+
+Implementa Webhooks 2.0: assinatura `X-Signature` (HMAC-SHA256) verificada antes de qualquer
+parsing do corpo. Resolvido o mesmo problema de "galinha e ovo" que o `ifthenpay.callback` já
+tinha resolvido (a chave de assinatura é por-merchant, só se sabe depois de resolver o
+merchant a partir da referência, que só é de confiar depois de verificar a assinatura) —
+`extract_reference()` separado, não verificado, só para escolher a chave.
+
+### Validado de ponta a ponta contra a conta de **produção** real da EuPago
+
+Diferente da sandbox usada nos testes anteriores — o utilizador confirmou que sandbox e
+produção são contas EuPago inteiramente separadas, cada uma com o seu próprio backoffice.
+Configurado o canal Webhooks 2.0 no backoffice real, túnel `cloudflared` efémero, três
+pagamentos MB WAY reais (€0,01 e €0,50 rejeitados pela EuPago com `AMOUNT_INVALID` — o mínimo
+real de produção fica entre os dois; €1,00 aceite).
+
+**Bug real encontrado e corrigido**: a EuPago tentou entregar o webhook 3 vezes (retries
+documentados) e falhou sempre — a causa ficou invisível até se corrigir o código para guardar
+o corpo bruto em falhas de parsing (antes só um aviso de log, sem persistência). O corpo real
+capturado revelou que a documentação oficial erra o nome do campo principal: `transaction`
+(singular), não `transactions` (plural) — mesma categoria do bug do `EstadoPedidosJSON` do MB
+WAY, descoberta só por uma chamada real. Corrigido, e confirmado reenviando o payload real
+capturado com uma assinatura calculada corretamente: `Payment.status` passou a `"confirmed"`.
+
+### Investigação da PINPAY (sem resultado definitivo)
+
+A pedido do utilizador, procurada uma forma de consultar o estado de um pagamento PINPAY sem
+depender do callback — como existe para MB WAY. Documentação oficial nova
+(`ifthenpay.com/docs`) é uma SPA que o fetch não consegue ler completamente; encontrada uma
+rota real via tentativa direta (`POST https://api.ifthenpay.com/gateway/pinpay/{key}/{ref}`,
+devolve `405`/`400` estruturado, confirmando que existe), mas **não continuada** — o propósito
+exato é desconhecido (podia ser consulta, podia ser algo que altera o pagamento), e testar às
+cegas contra produção real era demasiado arriscado. Recomendado contactar o suporte ifthenpay.
+O utilizador partilhou entretanto os URLs reais da documentação nova
+(`ifthenpay.com/docs/en/api/list-of-payments-rest/`, `ifthenpay.com/docs/en/api/pbl/`) —
+ainda por investigar.
+
+### Descoberta lateral, não corrigida
+
+`_has_slot_conflict()` (`bookwey`) chama `ScheduledService.objects.all_tenants()`, mas esse
+modelo não tem `TenantManager` — falha com `AttributeError` sempre que uma confirmação tardia
+(depois do `payment_deadline`) a aciona. Confirmado pré-existente em `main`. Reportado ao
+utilizador, não corrigido — fora do âmbito desta sessão.
+
+### Estado final
+
+| Repositório | Estado |
+|---|---|
+| `weypay-sdk` | Público, tag `v0.2.1`. 136 testes, gates verdes. |
+| `boxwey-serverless` | Branch `weypay-sdk-migration`, inalterado nesta parte. |
+| `bookwey-serverless` | Branch `weypay-sdk-migration`. Ambas as falhas de segurança fechadas; webhooks PINPAY e EuPago 2.0 implementados e validados ao vivo contra produção real. 129/129 testes, `requirements.txt` fixado a `v0.2.1`. |
+
+### Por fazer
+
+- Deploy de `bookwey-serverless` para `api.bookwey.com`, seguido de: migrations em produção →
+  `eupago_webhook_signing_key`/`ifthenpay_callback_key` nos merchants reais → trocar os URLs
+  de callback nos backoffices (EuPago e ifthenpay) do túnel temporário para o domínio real →
+  confirmar com um pagamento real.
+- Investigar a rota PINPAY descoberta (`gateway/pinpay/{key}/{ref}`) com o suporte ifthenpay,
+  ou ler a documentação nova partilhada pelo utilizador.
+- `ScheduledService` sem `TenantManager` — corrigir quando o utilizador quiser.
+- SIBS (Fase 5): continua bloqueada por falta de contrato/credenciais.

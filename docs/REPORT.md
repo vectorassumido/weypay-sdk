@@ -294,3 +294,81 @@ fim.**
   desenho do SDK, não uma tarefa mecânica — fica para quando puderes confirmar a abordagem.
 - **Fase 4 (segurança `bookwey`) e Fase 5 (SIBS)**: inalteradas, continuam fora do âmbito até
   decidires avançar — exigem configuração em backoffices externos.
+
+---
+
+## Adendo 2 — Fase 4 (subconjunto seguro + webhook PINPAY) e publicação (2026-08-18)
+
+Continuação direta do adendo acima, mesma sessão interativa, dias depois.
+
+### PINPAY validado com credenciais de produção reais
+
+Apple Pay e Google Pay confirmados a funcionar via PINPAY (`bookwey`), com as credenciais de
+produção do próprio utilizador (`ifthenpay_gateway_key`/`apple_key`/`google_key`, nunca lidas
+nem impressas por mim). Um achado inicial errado ("`Payment` fica `pending` porque falta
+mecanismo de confirmação") foi corrigido pelo próprio utilizador: a causa real era
+`success_url` apontar para `localhost`, inalcançável do dispositivo do teste — confirmado
+invocando `check_payment_status()` manualmente, que atualizou o estado de imediato.
+
+### Fase 4 — subconjunto sem dependência externa
+
+`GatewayCallLog` no `bookwey` (cópia do `boxwey`), `select_for_update()` em `pay_pagamento()`
+(fecha uma condição de corrida real entre confirmações concorrentes), e testes que provam
+(não hipotetizam) as duas falhas de segurança conhecidas. 97/97 testes.
+
+### Webhook PINPAY implementado e validado ao vivo
+
+Ao verificar os backoffices reais com o utilizador, descoberta estrutural: o callback
+ifthenpay é registado **por conta** (`APPLE`, `GOOGLE`, `CCARD`, `MBWAY`, ...), não por
+produto — a conta `MBWAY` já tinha o callback real de produção do `boxwey`; `APPLE`/`GOOGLE`
+(as que o PINPAY do `bookwey` usa) não tinham nenhum.
+
+Implementado `/api/webhooks/ifthenpay/` no `bookwey`, portado do `boxwey` (mesmas funções
+granulares do SDK partilhado, `GatewayCallLog`, mesmo `CallbackMapping`). Novo campo aditivo
+`Merchant.ifthenpay_callback_key`. 14 testes (porto dos 11 do `boxwey`). 111/111 testes totais.
+
+**Validado ao vivo, ponta-a-ponta**: túnel `cloudflared` efémero (binário isolado no
+scratchpad, removido no fim — nada instalado no sistema) expôs `localhost:8000`; callback
+registado nas contas `APPLE`/`GOOGLE` com uma chave anti-phishing gerada localmente; pagamento
+real de €0,01 via Apple Pay confirmado automaticamente, sem nenhuma chamada manual —
+`GatewayCallLog(outcome="paid", http_status=200)`, `Payment.status="confirmed"`. Primeira
+confirmação PINPAY do `bookwey` verificada de facto contra a ifthenpay.
+
+**Decisão explícita, não executada**: o ramo inseguro de `check_payment_status` (falha 2 das
+duas conhecidas) não foi removido — o callback testado apontava para o túnel temporário, e
+nada disto tinha ainda ido para produção. Sequência acordada antes de remover: deploy da
+branch → migrations em produção → `ifthenpay_callback_key` no merchant real → trocar o URL no
+backoffice ifthenpay para o domínio de produção → confirmar com um pagamento real → só então
+remover o fallback.
+
+### Publicação do `weypay-sdk`
+
+Resolvido o único bloqueio pendente para publicar (item 1 dos incidentes, acima): as
+credenciais reais em claro no histórico (commit `fb76f54`, Fase 0a) foram removidas com
+`git filter-repo --replace-text` — 37 commits preservados (mensagens, datas, granularidade),
+zero ocorrências dos valores originais confirmadas depois em `git log -p --all`. Cópia de
+segurança feita antes da reescrita, removida depois de verificada.
+
+Repositório criado pelo utilizador, tornado público depois (decisão dele, ao perceber que
+autenticação privada no build de produção ainda não estava configurada — público evita essa
+complexidade de infraestrutura, e o histórico já não tem segredos). Tag `v0.1.0` criada e
+publicada. `boxwey-serverless` e `bookwey-serverless` passam a fixar `weypay` no
+`requirements.txt` pela tag (nenhum dos dois tinha isto declarado — ambos só usavam
+`pip install -e` local). Instalação real verificada num venv isolado antes de cada commit.
+
+### Estado final desta sessão
+
+| Repositório | Estado |
+|---|---|
+| `weypay-sdk` | Público, `github.com/vectorassumido/weypay-sdk`, tag `v0.1.0`. 114 testes, gates verdes. |
+| `boxwey-serverless` | Branch `weypay-sdk-migration`, `requirements.txt` fixado à tag. 209/209 testes. |
+| `bookwey-serverless` | Branch `weypay-sdk-migration`, webhook PINPAY implementado e validado ao vivo, `requirements.txt` fixado à tag. 111/111 testes. |
+
+### Por fazer, para quando o utilizador quiser avançar
+
+- Deploy de `bookwey-serverless` a `api.bookwey.com` com esta branch, seguido da sequência de
+  5 passos acima antes de remover o fallback inseguro do PINPAY.
+- EuPago Webhooks 2.0: canal disponível no backoffice mas por configurar; falta escrever
+  `providers/eupago/callback.py` no SDK (nunca feito) antes de haver algo para configurar.
+- SIBS (Fase 5): continua bloqueada por falta de contrato/credenciais.
+- `Environment.FAKE` default: decisão de desenho pendente sobre o `FakeResponseRegistry`.

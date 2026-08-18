@@ -14,18 +14,24 @@ configuração nos backoffices dos gateways, que só o utilizador pode fazer.
    `pinpay` sem contactar a ifthenpay; a referência (`str(schedule.id.int)[-15:]`) é
    devolvida ao browser.
 
+   ⚠️ **Continua aberta de propósito** (2026-08-18): o webhook `/api/webhooks/ifthenpay/` já
+   existe (ver Correções abaixo), mas removê-la agora — antes de o callback estar registado e
+   testado ao vivo no backoffice ifthenpay — deixaria o PINPAY sem NENHUMA forma de confirmar
+   localmente. Ordem correta: registar o callback → confirmar que funciona de ponta a ponta →
+   só então remover este ramo. Não inverter a ordem.
+
 ## Correções, cada uma dependente de uma ação do utilizador primeiro
 
 | Correção | Depende de |
 |---|---|
 | Verificar `chave_api` do callback EuPago 1.0 | `docs/OPEN-QUESTIONS.md` #4 confirmado (é mesmo o mecanismo de verificação?) |
-| Migrar para Webhooks 2.0 (assinatura `X-Signature`) | Canal configurado no backoffice EuPago pelo utilizador |
-| Registar callback anti-phishing do PINPAY | Ação no backoffice ifthenpay pelo utilizador; `docs/OPEN-QUESTIONS.md` #7 |
-| Passar callbacks a platform-wide (`/api/v1/webhooks/eupago/`, `/api/v1/webhooks/ifthenpay/`) | Reconfigurar `adminCallback` no backoffice EuPago por-merchant → um só, platform-wide |
+| Migrar para Webhooks 2.0 (assinatura `X-Signature`) | ✅ canal disponível no backoffice EuPago (verificado 2026-08-18), mas por configurar — falta URL alcançável + gerar a chave criptográfica; `providers/eupago/callback.py` ainda não escrito no SDK |
+| ~~Registar callback anti-phishing do PINPAY~~ | ✅ **Rota implementada** (`bookwey` commit `0c813cb`, `/api/webhooks/ifthenpay/`) — falta só o utilizador colar uma URL alcançável + chave nas contas `APPLE`/`GOOGLE` do backoffice ifthenpay (descoberta: é por-conta, não por-produto — ver `docs/OPEN-QUESTIONS.md` #7) |
+| Passar callbacks a platform-wide (`/api/v1/webhooks/eupago/`, `/api/v1/webhooks/ifthenpay/`) | ✅ `/api/webhooks/ifthenpay/` já é platform-wide (uma rota, `Payment` localizado pela `reference`, mesmo padrão do `boxwey`) — falta a parte EuPago, e reconfigurar `adminCallback` por-merchant → um só |
 | Trocar a referência por 15 dígitos aleatórios | Migração de dados só em pagamentos `pending` — decisão sobre janela de corte é do utilizador |
-| `select_for_update` + unique index de dedupe | Nenhuma dependência externa — pode ir junto quando o resto avançar |
-| `GatewayCallLog` no `bookwey` | Cópia da definição de `02-boxwey-cleanup.md` — sem dependência externa |
-| Portar os 11 testes de webhook do `boxwey` | Depende da rota existir primeiro |
+| ~~`select_for_update` + unique index de dedupe~~ | ✅ Feito (`bookwey` commit `37bca3a`) |
+| ~~`GatewayCallLog` no `bookwey`~~ | ✅ Feito (`bookwey` commit `37bca3a`, escrito também no webhook desde `0c813cb`) |
+| ~~Portar os 11 testes de webhook do `boxwey`~~ | ✅ Feito — 14 testes (`bookwey` commit `0c813cb`, `integrations/payments/tests/test_ifthenpay_webhook.py`) |
 
 ## Porque não entra na execução autónoma
 

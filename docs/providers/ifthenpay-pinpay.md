@@ -96,6 +96,35 @@ mas **não foi isto que este teste demonstrou** — é conhecido desde a leitura
 original, antes de qualquer migração. Ver (d) acima para a pergunta em aberto sobre se existe
 mesmo um callback/endpoint de estado do lado da ifthenpay.
 
+## (i) O callback é registado por-CONTA, não por-produto (2026-08-18, backoffice real)
+
+✅ **Descoberta estrutural, confirmada visualmente no backoffice ifthenpay do utilizador**
+(`Administração → Contrato/Contas`): o callback anti-phishing **não** é uma configuração
+única do produto PINPAY/Gateway. Cada "Conta" (sub-conta por método de pagamento — `APPLE`,
+`CCARD`, `DD`, `GOOGLE`, `MB`, `MBWAY`, `PAYSHOP`) tem o seu **próprio** ícone de "Ativação de
+Callback", com o seu próprio URL + Chave Anti-phishing. Quando o PINPAY processa um pagamento
+através de, por exemplo, `APPLE|<key>`, é o callback registado **nessa conta `APPLE`** que
+dispara — não existe um callback "do PINPAY" separado. Confirmado também que o menu "Pay By
+Link & PINPAY" da barra lateral (`Novo`/`Histórico`) é só para gerar links/formulários
+manualmente — **não tem nenhuma configuração de callback própria**.
+
+Estado observado nesta conta: a conta `MBWAY | LML-691666` já tem um callback real
+configurado — `https://api.boxwey.com/api/v1/webhooks/ifthenpay/?chave=[ANTI_PHISHING_KEY]&
+referencia=[REFERENCIA]&valor=[VALOR]&estado=[ESTADO]` — mas essa é a conta usada
+**diretamente** pelo `boxwey` (MB WAY, não PINPAY), já em produção. As contas `APPLE` e
+`GOOGLE` (as que o `bookwey` usa via `accounts=` no PINPAY, ver (c) acima) **não tinham
+nenhum callback configurado** — confirmado pelo utilizador clicando no ícone de cada uma.
+
+**Consequência para a Fase 4**: para o `bookwey` receber confirmações de PINPAY (Apple
+Pay/Google Pay), é preciso registar um callback em **cada conta usada** (`APPLE`, `GOOGLE`,
+e `CCARD` se/quando ativado) — não um único registo. O URL de callback do `bookwey` foi
+implementado (`bookwey-serverless` commit `0c813cb`, `/api/webhooks/ifthenpay/`, ver
+`docs/migration/04-bookwey-security.md`), com o mesmo `CallbackMapping` do MB WAY
+(`chave`/`referencia`/`valor`/`estado`) — a mesma convergência que o `docs/PLAN.md` já
+recomendava. Falta só: (1) uma URL alcançável para colar no campo "URL de Callback" (túnel ou
+deploy real — não local), e (2) escolher uma chave anti-phishing (≥15 caracteres) e colá-la
+também em `Merchant.ifthenpay_callback_key` no admin do `bookwey`.
+
 ## (g) Delta a corrigir
 
 - Nada no protocolo — a chamada de criação está correta.

@@ -35,6 +35,24 @@ concluído (mais recente no topo), mais o estado corrente.
   as duas falhas continuam abertas, só ficaram mais fáceis de auditar/corrigir depois. Falta a
   parte que precisa de ação do utilizador (canal EuPago 2.0, callback PINPAY no backoffice —
   agora possível, há credenciais reais). Ver `docs/migration/04-bookwey-security.md`.
+- **2026-08-18 — backoffices reais verificados com o utilizador, e o webhook PINPAY do
+  `bookwey` implementado** (`bookwey` commit `0c813cb`):
+  - **EuPago**: Webhooks 2.0 disponível no canal, mas por configurar (ecrã vazio, chave
+    criptográfica ainda não gerada).
+  - **ifthenpay — descoberta estrutural**: o callback não é por-produto (PINPAY), é
+    **por-conta** (`APPLE`, `GOOGLE`, `CCARD`, `MBWAY`, ...), cada uma com o seu próprio
+    registo em `Administração → Contrato/Contas`. A conta `MBWAY` já tinha o callback real de
+    produção do `boxwey`; `APPLE`/`GOOGLE` (as que o `bookwey` usa) não tinham nenhum. O menu
+    "Pay By Link & PINPAY" é só para gerar links manualmente, sem configuração própria. Ver
+    `docs/OPEN-QUESTIONS.md` #7 (resolvida), `docs/providers/ifthenpay-pinpay.md` (i).
+  - **Implementado**: `/api/webhooks/ifthenpay/` no `bookwey`, portado do `boxwey`
+    (`verify_key`/`verify_amount`/`parse_status` do SDK partilhado, `GatewayCallLog`, mesmo
+    `CallbackMapping` do MB WAY). Novo campo aditivo `Merchant.ifthenpay_callback_key`. 14
+    testes novos (porto dos 11 do `boxwey`, adaptados ao modelo `Payment` sem estado
+    "refunded" próprio). 111/111 testes, `makemigrations --check` limpo.
+  - **Falta**: uma URL alcançável para registar nas contas `APPLE`/`GOOGLE` (túnel ou deploy
+    real) e escolher a chave anti-phishing a colar em ambos os lados. EuPago 2.0 fica para
+    depois (mesmo padrão: escrever `providers/eupago/callback.py` no SDK primeiro).
 - **2026-08-18 — PINPAY (Apple Pay + Google Pay) validado com credenciais de produção reais
   do utilizador** (`ifthenpay_gateway_key`/`apple_key`/`google_key` configuradas por ele no
   admin — nunca lidas nem impressas por mim, só booleanos "set: True/False" verificados).

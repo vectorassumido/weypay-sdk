@@ -5,6 +5,18 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
+- **2026-08-18 — `weypay-sdk` publicado**: repositório público em
+  `github.com/vectorassumido/weypay-sdk`, tag `v0.1.0`. O quase-incidente de credenciais no
+  histórico (Fase 0a, ficheiro `docs/LOCAL-TESTING.md`) foi resolvido primeiro —
+  `git filter-repo --replace-text` substituiu os 4 valores reais em todos os 37 commits
+  (verificado: zero ocorrências dos valores originais em `git log -p --all` depois), histórico
+  e mensagens preservados. Cópia de segurança feita antes, removida depois de confirmar.
+  `pyproject.toml` version `0.1.0.dev0` → `0.1.0`. `boxwey-serverless` e `bookwey-serverless`
+  passam a fixar `weypay` no `requirements.txt` pela tag (`weypay @
+  git+https://github.com/vectorassumido/weypay-sdk@v0.1.0`) em vez de só instalado editable
+  localmente — nenhum dos dois tinha isto declarado até agora. Instalação real verificada num
+  venv isolado antes de commitar (import funcional, não só sintaxe). `boxwey` 209/209,
+  `bookwey` 111/111.
 - **Fase:** 3 **concluída** (passos 1-3; passo 4 deliberadamente adiado — ver Log).
   `bookwey-serverless` adota o transporte SDK para EuPago/PINPAY. **91/91 testes, `OK`**,
   idêntico à baseline.

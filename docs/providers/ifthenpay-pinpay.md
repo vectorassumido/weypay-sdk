@@ -71,6 +71,31 @@ PINPAY com os mesmos nomes do MB WAY para os dois projetos partilharem um único
 ifthenpay — falha de segurança tratada em `docs/migration/04-bookwey-security.md`, fora do
 âmbito autónomo (Fase 4).
 
+✅ **Confirmado com um pagamento real (2026-08-18)**: checkout PINPAY criado com sucesso
+(`RedirectUrl` funcional, `accounts=APPLE|...;GOOGLE|...` com as chaves reais de produção do
+utilizador — `ifthenpay_mbway_key`/`ifthenpay_ccard_key` não configuradas, por isso só Apple
+Pay e Google Pay disponíveis nesta conta), **Apple Pay e Google Pay confirmados a funcionar**
+(pagamento de €0,01 completado pelo utilizador em ambos).
+
+⚠️→✅ **Achado inicial corrigido, não deixar a versão errada.** Logo a seguir ao pagamento,
+`Payment.status` continuava `"pending"` — a primeira leitura foi "confirma o gap de segurança
+do `check_payment_status`". **Errado, e corrigido pelo próprio utilizador**: o teste real foi
+feito noutro dispositivo, e `success_url`/`front_domain` do merchant local aponta para
+`http://salao-beleza-viva.localhost:3000/aguardar-pagamento?reference=...` —
+**inalcançável fora da máquina de dev** (mesma classe de problema já encontrada com o
+`adminCallback` da EuPago). É essa página (`booksys-fe/app/pages/aguardar-pagamento.vue`) que
+faz *polling* a `/api/pagamento-status/<reference>/` (`check_payment_status`) — nunca chegou a
+carregar, por isso nunca chamou nada. **Confirmado invocando `check_payment_status()`
+manualmente para esta mesma referência**: `status` passa a `"confirmed"` imediatamente,
+`schedule.is_active=True`. O mecanismo de atualização funciona quando é de facto chamado — o
+que faltou foi só o browser conseguir chegar lá, uma limitação de teste local, não um bug.
+
+O gap de segurança em si (`check_payment_status` confirma `pinpay` **sem verificar nada junto
+da ifthenpay** — só confia em quem quer que chame o endpoint) continua real e por corrigir,
+mas **não foi isto que este teste demonstrou** — é conhecido desde a leitura do código
+original, antes de qualquer migração. Ver (d) acima para a pergunta em aberto sobre se existe
+mesmo um callback/endpoint de estado do lado da ifthenpay.
+
 ## (g) Delta a corrigir
 
 - Nada no protocolo — a chamada de criação está correta.

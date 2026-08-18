@@ -26,12 +26,23 @@ concluído (mais recente no topo), mais o estado corrente.
   vários desfechos do mesmo endpoint sem alargar o desenho; decisão a confirmar com o
   utilizador), Fase 4 (segurança `bookwey`) e Fase 5 (SIBS) por inteiro, PINPAY/Apple Pay no
   `bookwey` (utilizador precisa de pedir conta de teste à ifthenpay primeiro).
+- **2026-08-18 — PINPAY (Apple Pay + Google Pay) validado com credenciais de produção reais
+  do utilizador** (`ifthenpay_gateway_key`/`apple_key`/`google_key` configuradas por ele no
+  admin — nunca lidas nem impressas por mim, só booleanos "set: True/False" verificados).
+  Checkout PINPAY criado (€0,01, `minimum_payment_amount` do merchant baixado temporariamente
+  e reposto a 5.00 no fim), `RedirectUrl` funcional, utilizador confirmou Apple Pay **e**
+  Google Pay a funcionar. **Achado inicial corrigido pelo próprio utilizador**: `Payment`
+  ficou `"pending"` a seguir ao pagamento — não por falta de mecanismo de confirmação, mas
+  porque `success_url`/`front_domain` aponta para `localhost`, inalcançável do dispositivo
+  usado no teste (mesma classe do `adminCallback` EuPago já visto). Confirmado invocando
+  `check_payment_status()` manualmente: `status` passa a `"confirmed"` de imediato. O gap de
+  segurança conhecido (`check_payment_status` confirma `pinpay` sem verificar nada junto da
+  ifthenpay) continua real, mas este teste não o demonstrou — é conhecido desde a leitura do
+  código original. Ver `docs/providers/ifthenpay-pinpay.md`, `docs/OPEN-QUESTIONS.md` #24.
 - **2026-08-15 — utilizador pausou a sessão** depois de validar pagamentos reais em 3 dos 4
   produtos (EuPago MB WAY/split, EuroPix, ifthenpay MB WAY — pago/recusado/expirado×2). Nada
   ficou a meio: todos os gates verdes, tudo commitado. Ver "Adendo" em `docs/REPORT.md` para o
-  resumo completo desta sessão interativa. **Retomar aqui**: ou PINPAY quando houver conta de
-  teste, ou Fase 4/5 quando o utilizador quiser avançar — nenhuma das duas é acionável sem
-  input dele (credenciais/decisão de desenho), por isso não há próximo passo autónomo óbvio.
+  resumo completo desta sessão interativa.
 - **Modo:** interativo (utilizador presente quando ativo). Ver `docs/REPORT.md` para o
   relatório completo da execução autónoma 0a→3 e o adendo da validação real 0a→3+.
 - **2026-08-14 — pagamento sandbox real concluído com sucesso em `bookwey-serverless`**,

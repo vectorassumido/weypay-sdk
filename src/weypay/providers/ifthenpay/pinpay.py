@@ -94,3 +94,70 @@ def create_payment(
         redirect_url=redirect_url,
         call=call,
     )
+
+
+_LIST_PAYMENTS_ENDPOINTS = GatewayEndpoints(production="https://api.ifthenpay.com/v2/payments")
+
+
+def get_order_status(
+    *,
+    bo_key: str,
+    order_id: str,
+    environment: Environment = Environment.PRODUCTION,
+    acknowledge_no_sandbox: bool = False,
+) -> tuple[PaymentStatus, dict[str, object]]:
+    """✅ "List of Payments REST" (``POST /v2/payments/read``) — documentado pela própria
+    ifthenpay como alternativa/complemento ao callback: "As an alternative or complement to
+    the callback (webhook), you can retrieve completed payments using a web service." Cobre
+    toda a conta (MB, MBWAY, PAYSHOP, CCARD, COFIDIS, GOOGLE, APPLE, PIX, TPA), não só PINPAY
+    — mas ``orderId`` corresponde exatamente ao ``id`` que ``create_payment`` envia (ambos
+    limitados a 15 caracteres), o que a torna utilizável como fallback de reconciliação do
+    PINPAY quando o callback falha.
+
+    Requer ``bo_key`` — "key provided by ifthenpay when signing the contract", credencial
+    distinta da ``gateway_key`` (usada para criar o pagamento) e da chave anti-phishing
+    (usada para validar o callback). ⚠️ Ainda não confirmado onde/como obter esta chave —
+    ver docs/OPEN-QUESTIONS.md.
+
+    A resposta não tem um campo de estado por pagamento: o endpoint só lista pagamentos
+    **concluídos** (documentado explicitamente), portanto a presença de um item com o
+    ``order_id`` pedido já significa PAID. A ausência não distingue "ainda pendente" de
+    "``order_id`` nunca existiu" — a própria API não oferece essa distinção, por não ser um
+    endpoint de consulta de estado por referência, mas de listagem de pagamentos feitos.
+    """
+    base_url = resolve_base_url(
+        environment, _LIST_PAYMENTS_ENDPOINTS, acknowledge_no_sandbox=acknowledge_no_sandbox
+    )
+    url = f"{base_url}/read"
+
+    payload: dict[str, str] = {"boKey": bo_key, "orderId": order_id}
+
+    data, call = perform_request(
+        method="POST",
+        url=url,
+        provider="ifthenpay.pinpay",
+        operation="get_order_status",
+        environment=environment,
+        json_body=payload,
+        secret_keys=frozenset({"boKey"}),
+        retry=True,
+    )
+    if data is None or call.http_status is None or not (200 <= call.http_status < 300):
+        raise GatewayRejected(
+            call.http_status or 0, data if data is not None else (call.response or ""), call=call
+        )
+
+    body_status = data.get("status")
+    if body_status is not None and body_status != 200:
+        # 403 documentado como "Invalid boKey" — corpo, não necessariamente o HTTP status.
+        raise GatewayRejected(call.http_status, data, call=call)
+
+    payments = data.get("payments")
+    matches = [
+        p
+        for p in (payments if isinstance(payments, list) else [])
+        if isinstance(p, dict) and str(p.get("orderId")) == order_id
+    ]
+    if matches:
+        return PaymentStatus.PAID, matches[0]
+    return PaymentStatus.PENDING, data

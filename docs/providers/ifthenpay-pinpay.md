@@ -125,6 +125,52 @@ recomendava. Falta só: (1) uma URL alcançável para colar no campo "URL de Cal
 deploy real — não local), e (2) escolher uma chave anti-phishing (≥15 caracteres) e colá-la
 também em `Merchant.ifthenpay_callback_key` no admin do `bookwey`.
 
+## (j) Consulta de estado / fallback de reconciliação — "List of Payments REST" (2026-08-19)
+
+✅ **Confirmado via a documentação oficial** (URLs partilhados pelo utilizador:
+`ifthenpay.com/docs/en/api/list-of-payments-rest/` e `.../api/pbl/`, ambos SPAs em React —
+o conteúdo real só ficou acessível via `openapi.yaml`, referenciado no HTML bruto da página
+mas não pelo `WebFetch`). A ifthenpay documenta explicitamente esta API como resposta à
+pergunta #23: *"As an alternative or complement to the callback (webhook), you can retrieve
+completed payments using a web service."*
+
+**Endpoint**: `POST https://api.ifthenpay.com/v2/payments/read`. Cobre a conta inteira —
+`entity` aceita `MB`/`MBWAY`/`PAYSHOP`/`CCARD`/`COFIDIS`/`GOOGLE`/`APPLE`/`PIX`/`TPA` — não é
+específico do PINPAY, mas `orderId` no pedido e na resposta corresponde exatamente ao `id`
+que `create_payment` (acima) envia — mesmo limite de 15 caracteres — o que o torna
+diretamente utilizável para reconciliar pagamentos PINPAY (`APPLE`/`GOOGLE`) por `id`.
+
+**Pedido** (todos os campos opcionais exceto `boKey`; sem filtros devolve os 1000 pagamentos
+mais recentes): `boKey`, `entity`, `subEntity` (ex. `"APPLE KEY"`), `reference`, `orderId`,
+`amount`, `requestId`, `dateStart`/`dateEnd` (`dd-MM-yyyy HH:mm:ss`), `procDateStart`/
+`procDateEnd` (`yyyyMMdd`).
+
+**Resposta**: `message`, `status` (`200` ou `403` — "Invalid boKey" — campo do corpo, não
+necessariamente o HTTP status), `payments[]` com `amount`, `entity`, `fee`, `netAmount`,
+`orderId`, `paymentDate`, `procDate`, `reference`, `requestId`, `subEntity`, `terminal`. **Sem
+campo de estado por pagamento** — o endpoint só lista pagamentos **concluídos**
+("retrieve completed payments"), portanto a presença de um item com o `orderId` pedido já
+significa pago; a ausência não distingue "ainda pendente" de "`orderId` nunca existiu" (a
+própria API não faz essa distinção).
+
+**Bloqueio real, não resolvido**: exige `boKey` — "key provided by ifthenpay when signing the
+contract" / "Backoffice key that identifies the merchant account" (visto também como campo
+obrigatório da API de ativação de callback por API, `POST /callback/activation`, não usada
+esta sessão porque o callback já foi ativado manualmente no backoffice — ver (i) acima). É
+uma credencial **distinta** da `gateway_key` (cria o pagamento) e da chave anti-phishing
+(valida o callback). ⚠️ Onde/como obtê-la não foi confirmado — possivelmente o campo "Chave
+de Backoffice" visto mascarado no modal "Ativação de Callback" do backoffice, nunca preenchido
+nem lido esta sessão (nunca se lê nem transporta uma credencial real — ver regra 6 da skill
+`weypay-phase`). Ver `docs/OPEN-QUESTIONS.md` #26.
+
+**Implementado e testado** (fixtures a partir do schema documentado, sem credencial real —
+mesmo padrão usado para todo o SDK antes de validação em sandbox/produção real):
+`weypay/providers/ifthenpay/pinpay.py::get_order_status(*, bo_key, order_id, ...)`, `v0.3.0`.
+**Não ligado a nenhum consumidor em modo ativo** — `bookwey` ganhou o campo aditivo
+`Merchant.ifthenpay_bo_key` (em branco por omissão) e uma chamada condicional em
+`check_payment_status` que só corre se o campo estiver preenchido; com o campo vazio (estado
+atual, em todos os merchants), o comportamento fica exatamente como estava — sem regressão.
+
 ## (g) Delta a corrigir
 
 - Nada no protocolo — a chamada de criação está correta.

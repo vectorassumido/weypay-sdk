@@ -47,10 +47,10 @@ def extract_reference(body: bytes) -> str:
     verificação real acontece a seguir em `verify_and_parse`. Um pedido forjado com uma
     referência de outro merchant continua a falhar aí, porque a assinatura não bate certo com
     a chave desse merchant."""
-    transaction = _parse_transactions(body)
+    transaction = _parse_transaction(body)
     reference = str(transaction.get("reference", "") or "")
     if not reference:
-        raise WebhookVerificationError("'transactions.reference' em falta ou vazio")
+        raise WebhookVerificationError("'transaction.reference' em falta ou vazio")
     return reference
 
 
@@ -78,10 +78,10 @@ def verify_and_parse(*, body: bytes, signature: str, key: str) -> WebhookEvent:
     devolve um evento a partir de um pedido não verificado."""
     verify_signature(body=body, signature=signature, key=key)
 
-    transaction = _parse_transactions(body)
+    transaction = _parse_transaction(body)
     reference = str(transaction.get("reference", "") or "")
     if not reference:
-        raise WebhookVerificationError("'transactions.reference' em falta ou vazio")
+        raise WebhookVerificationError("'transaction.reference' em falta ou vazio")
 
     raw_status = str(transaction.get("status", "") or "")
     status = STATUS_MAP.get(raw_status, PaymentStatus.UNKNOWN)
@@ -99,15 +99,20 @@ def verify_and_parse(*, body: bytes, signature: str, key: str) -> WebhookEvent:
     )
 
 
-def _parse_transactions(body: bytes) -> dict[str, Any]:
+def _parse_transaction(body: bytes) -> dict[str, Any]:
     try:
         data: dict[str, Any] = json.loads(body)
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise WebhookVerificationError(f"corpo não é JSON válido: {exc}") from exc
 
-    transaction = data.get("transactions")
+    # ✅ Confirmado com um payload real de produção (2026-08-18): o campo é "transaction",
+    # singular — a documentação oficial diz "transactions" (plural). Descoberto porque a
+    # EuPago tentou entregar um webhook real 3 vezes (retries documentados, 2 em 2 min) e
+    # todas falharam a extrair a referência, até o corpo bruto ficar capturado em log e
+    # revelar a grafia real. Mesma categoria de erro que o EstadoPedidosJSON do MB WAY.
+    transaction = data.get("transaction")
     if not isinstance(transaction, dict):
-        raise WebhookVerificationError("corpo sem campo 'transactions'")
+        raise WebhookVerificationError("corpo sem campo 'transaction'")
     return transaction
 
 

@@ -1,11 +1,13 @@
 """Testes do provider EuPago Webhooks 2.0.
 
-⚠️ O corpo JSON usado aqui segue exatamente o exemplo da documentação oficial
-(docs/providers/eupago-webhooks.md (a)) — ainda não confirmado por um payload real observado
-(isso só é possível depois de configurar o canal Webhooks 2.0 no backoffice e receber um
-pagamento real). A assinatura HMAC-SHA256 em si é calculada aqui com o mesmo algoritmo
-documentado (hash_hmac('sha256', $data, $key, true), comparado ao base64-decode do header) —
-essa parte é protocolo verificável independentemente de um payload real.
+✅ O corpo JSON usado aqui é o formato **real observado em produção** (2026-08-18, pagamento
+MB WAY de €1,00) — não o exemplo da documentação oficial, que erra o nome do campo principal
+("transactions", plural — o real é "transaction", singular) e alguns tipos (amount.value e
+trid vêm como string, não número). Só descoberto porque a EuPago tentou entregar um webhook
+real 3 vezes e todas falharam antes de o corpo bruto ficar capturado em log — ver
+docs/observed/eupago_webhook_paid.json. A assinatura HMAC-SHA256 é calculada aqui com o mesmo
+algoritmo documentado (hash_hmac('sha256', $data, $key, true), comparado ao base64-decode do
+header) — isso sempre esteve correto.
 """
 
 from __future__ import annotations
@@ -31,19 +33,25 @@ def _sign(body: bytes, key: str = KEY) -> str:
 
 
 def _body(**overrides: object) -> bytes:
-    transaction = {
-        "entity": 12345,
+    transaction: dict[str, object] = {
+        "entity": "10076",
         "reference": "320780",
-        "identifier": "agendamento-123",
-        "method": "Mbway",
-        "amount": {"value": 15.0, "currency": "EUR"},
-        "fees": {"amount": 0.18, "currency": "EUR"},
-        "date": "2026-08-18T22:59:02Z",
-        "trid": 29751801,
+        "identifier": "Salao-agendamento-123",
+        "method": "MW:PT",
+        "amount": {"value": "15.00", "currency": "EUR"},
+        "fees": {"value": 0.18, "currency": "EUR"},
+        "date": "2026-08-18T22:59:02",
+        "trid": "29751801",
         "status": "Paid",
+        "local": "Sem Informação",
     }
     transaction.update(overrides)
-    return json.dumps({"transactions": transaction, "channel": {"name": "VECTORASSUMIDO"}}).encode()
+    return json.dumps(
+        {
+            "channel": {"account": "VECTORASSUMIDO", "name": "VECTORASSUMIDO"},
+            "transaction": transaction,
+        }
+    ).encode()
 
 
 # --- extract_reference (não verificada — só para escolher a chave por-merchant) ----------
@@ -155,9 +163,9 @@ def test_missing_reference_raises() -> None:
         verify_and_parse(body=body, signature=_sign(body), key=KEY)
 
 
-def test_body_without_transactions_field_raises() -> None:
+def test_body_without_transaction_field_raises() -> None:
     body = json.dumps({"channel": {"name": "x"}}).encode()
-    with pytest.raises(WebhookVerificationError, match="transactions"):
+    with pytest.raises(WebhookVerificationError, match="transaction"):
         verify_and_parse(body=body, signature=_sign(body), key=KEY)
 
 
@@ -194,5 +202,5 @@ def test_payload_is_the_full_parsed_body() -> None:
     body = _body()
     event = verify_and_parse(body=body, signature=_sign(body), key=KEY)
 
-    assert "transactions" in event.payload
-    assert event.payload["transactions"]["reference"] == "320780"
+    assert "transaction" in event.payload
+    assert event.payload["transaction"]["reference"] == "320780"

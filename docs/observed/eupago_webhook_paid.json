@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "date": "2026-08-18",
+    "context": "Webhook real da EuPago (Webhooks 2.0), conta de produção real do utilizador (VECTORASSUMIDO), pagamento MB WAY de €1,00 confirmado. Capturado só depois de corrigir o código para guardar o corpo bruto em falhas de parsing — as 3 primeiras tentativas de entrega (retries documentados, 2 em 2 min) falharam silenciosamente antes disso.",
+    "note": "Confirma um erro real na documentação oficial: o campo principal chama-se 'transaction' (singular), não 'transactions' (plural) como a documentação descreve. Também: amount.value e trid vêm como string, não número; fees usa 'value', não 'amount'; date não tem sufixo 'Z'; method usa o vocabulário 'MW:PT' (estilo Webhooks 1.0), não 'Mbway'; existe um campo extra 'local' e 'channel.account' não documentados. Nenhum destes últimos afeta o parsing (não são usados), só o nome do campo principal."
+  },
+  "http_status_received_by_us": 400,
+  "outcome_before_fix": "unparseable_body — corpo rejeitado porque o código procurava 'transactions', não 'transaction'",
+  "raw_body": {
+    "channel": {
+      "account": "VECTORASSUMIDO",
+      "name": "VECTORASSUMIDO"
+    },
+    "transaction": {
+      "entity": "10076",
+      "reference": "76856709",
+      "identifier": "Salao-57d69e2a-3bc2-41a9-a933-1865aa59cef6",
+      "method": "MW:PT",
+      "amount": { "value": "1", "currency": "EUR" },
+      "fees": { "value": 0.1476, "currency": "EUR" },
+      "date": "2026-08-18T23:56:58",
+      "trid": "118845709",
+      "status": "Paid",
+      "local": "Sem Informação"
+    }
+  }
+}

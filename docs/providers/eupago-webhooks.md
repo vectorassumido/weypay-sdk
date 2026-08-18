@@ -35,7 +35,8 @@ assim é da Fase 4, com teste que a comprove.
 ## 2.0 (Realtime Webhooks)
 
 ### (a) Transporte
-✅ `POST`. Corpo:
+✅ `POST`. Corpo, **conforme a documentação** (⚠️ tem um erro real — ver "Confirmado com um
+payload real" mais abaixo: o campo principal é `transaction`, singular, não `transactions`):
 ```json
 {
   "transactions": {
@@ -90,14 +91,42 @@ em trânsito, redundante com HTTPS (anti-overengineering, `docs/PLAN.md`).
 é falha definitiva do pagamento ou um erro transitório do lado da EuPago; nunca assumir sem
 observar um `Error` real primeiro (regra 6, docs/SECURITY.md).
 
-⚠️ **Não confirmado por um payload real** — os testes (`tests/providers/
-test_eupago_callback.py`, 19 testes) usam o exemplo *verbatim* da documentação oficial para o
-corpo, e o algoritmo HMAC documentado para a assinatura (esse é protocolo verificável
-independentemente de um payload real observado). Falta: configurar o canal Webhooks 2.0 no
-backoffice, gerar a chave criptográfica, e receber um pagamento real para confirmar a forma
-exata do corpo e o vocabulário de `status` contra a realidade — mesma disciplina aplicada ao
-MB WAY (`EstadoPedidosJSON` só ficou correto depois de uma chamada real corrigir três pontos
-que a documentação tinha errados).
+## Confirmado com um payload real — a documentação errava o nome do campo principal (2026-08-18)
+
+✅ **Validado de ponta a ponta em produção real**: canal Webhooks 2.0 configurado no
+backoffice (URL + chave criptográfica gerada por eles), pagamento MB WAY real de €1,00
+(mínimo real da EuPago para MB WAY em produção — €0,50 é rejeitado com `AMOUNT_INVALID`; o
+valor exato entre os dois não foi isolado). A EuPago tentou entregar o webhook 3 vezes
+(retries documentados, 2 em 2 min) e todas as 3 falharam — o código original só registava um
+aviso genérico, sem guardar o corpo recebido, por isso a causa ficou invisível até se corrigir
+isso e reobservar.
+
+**Corpo real capturado** (`docs/observed/eupago_webhook_paid.json`):
+```json
+{
+  "channel": {"account": "VECTORASSUMIDO", "name": "VECTORASSUMIDO"},
+  "transaction": {
+    "entity": "10076", "reference": "76856709",
+    "identifier": "Salao-...", "method": "MW:PT",
+    "amount": {"value": "1", "currency": "EUR"},
+    "fees": {"value": 0.1476, "currency": "EUR"},
+    "date": "2026-08-18T23:56:58", "trid": "118845709",
+    "status": "Paid", "local": "Sem Informação"
+  }
+}
+```
+
+**Erro real na documentação, agora corrigido**: o campo principal chama-se **`transaction`**
+(singular) — a documentação oficial (topo desta secção, (a)) diz `transactions` (plural). Era
+exatamente essa a causa das 3 falhas de entrega. Diferenças adicionais, nenhuma delas exigiu
+mudar o código (não usávamos esses campos, ou já eram tolerantes ao tipo):
+`amount.value`/`trid` vêm como **string**, não número; `fees` usa a chave `value`, não
+`amount`; `date` não tem sufixo `Z`; `method` usa o vocabulário `MW:PT` (estilo Webhooks 1.0),
+não `Mbway`; há um campo extra `local` e `channel.account` não documentados.
+
+**`status: "Paid"` confirmado exatamente como documentado** — essa parte da documentação
+estava certa. Mesma categoria de erro que o `EstadoPedidosJSON` do MB WAY: a documentação
+pública tinha um erro concreto, só visível numa chamada real, nunca por leitura atenta.
 
 ## Fonte
 

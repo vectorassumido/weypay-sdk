@@ -5,6 +5,17 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
+- **2026-08-18 — Fase 4 completa: as duas falhas de segurança conhecidas estão corrigidas.**
+  Falha #1 (`GET /api/pagamento-callback/<uuid>/`, confirmava sem verificar nada) removida
+  por completo (`bookwey` commit `064101e`) — sem caller legítimo, confirmado por grep
+  sistemático antes de tocar. Escrito `providers/eupago/callback.py` no SDK (nunca feito até
+  agora — Webhooks 2.0, assinatura `X-Signature` HMAC-SHA256, `extract_reference()` separado
+  para resolver a chave por-merchant antes de verificar, mesmo padrão do `ifthenpay.callback`).
+  Novo `/api/webhooks/eupago/` no `bookwey`. SDK tag `v0.2.0`, `bookwey` `requirements.txt`
+  atualizado e reinstalado num venv isolado para confirmar (não só sintaxe). 128/128 testes no
+  `bookwey`, 136/136 no SDK. **Falta**: validar `/api/webhooks/eupago/` contra um payload real
+  (túnel + pagamento real) — ver `docs/OPEN-QUESTIONS.md` #25. Ver
+  `docs/migration/04-bookwey-security.md` para a cronologia completa.
 - **2026-08-18 — antes do deploy para produção, falha crítica ativa encontrada e corrigida**:
   `reconcile_pending_payments` (job de produção, 5 em 5 min, presente desde sempre) confirmava
   cegamente qualquer pagamento `pinpay` pendente há >15 min, pago ou não — já em produção,

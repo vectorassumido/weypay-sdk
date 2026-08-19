@@ -36,7 +36,7 @@ def create_split_payment(
     identifier: str,
     amount: Money,
     beneficiaries: list[Beneficiary],
-    admin_callback: str,
+    admin_callback: str = "",
     alias: str | None = None,
     lang: str = "PT",
     environment: Environment,
@@ -44,13 +44,18 @@ def create_split_payment(
 ) -> PaymentResult:
     """``POST /v1/split-payments/{method}``. ``method`` ∈ multibanco|mbway|pix|creditcard|
     applepay|googlepay (ver docs/providers/eupago-mbway.md (c)). ``alias`` é o telefone,
-    só usado no método ``mbway``. ``base_url``: ver docstring de mbway.create_payment."""
+    só usado no método ``mbway``. ``base_url``: ver docstring de mbway.create_payment.
+
+    ✅ ``admin_callback`` é opcional (documentado pela própria EuPago: "receive a
+    communication when this reference is paid") — confirmado, com um teste controlado real
+    em sandbox, que NÃO afeta a confirmabilidade da referência mesmo quando inalcançável (ver
+    docs/providers/eupago-mbway.md, docs/observed/
+    eupago_split_admincallback_unreachable_is_cosmetic.json). Omitir para não o enviar."""
     resolved_base_url = base_url or resolve_base_url(environment, ENDPOINTS)
     url = f"{resolved_base_url}/v1/split-payments/{method}"
     payload: dict[str, object] = {
         "amount": amount.to_gateway_number(),
         "identifier": identifier,
-        "adminCallback": admin_callback,
         "lang": lang,
         "beneficiaries": [
             {
@@ -64,6 +69,8 @@ def create_split_payment(
     }
     if alias:
         payload["alias"] = alias
+    if admin_callback:
+        payload["adminCallback"] = admin_callback
 
     data, call = perform_request(
         method="POST",

@@ -1,0 +1,26 @@
+{
+  "_nota": "Teste controlado real em sandbox (2026-08-19), a corrigir um achado errado de 2026-08-14 (ver git blame em docs/providers/eupago-mbway.md). Três referências de split MB WAY criadas via weypay.providers.eupago.split.create_split_payment, sandbox real.",
+  "reference_A": {
+    "reference": "321448",
+    "adminCallback": "http://localhost:9999/dead-unreachable",
+    "criacao": "HTTP 201, transactionStatus=Success -- adminCallback inalcançável não impede a criação",
+    "marcar_como_paga_1a_tentativa": "Erro na UI: \"Ocorreu um erro! O estado da referência não foi alterado.\"",
+    "estado_apos_refresh_sem_nova_acao": "Paga -- confirmado por print do backoffice"
+  },
+  "reference_B": {
+    "reference": "321449",
+    "adminCallback": "https://<tunel-cloudflared-efemero>/admincallback-test",
+    "criacao": "HTTP 201, transactionStatus=Success",
+    "marcar_como_paga": "Sucesso direto, sem erro",
+    "adminCallback_chamado": "Confirmado -- GET recebido no recetor local exatamente no momento de marcar como paga, consistente com a doc oficial (\"receive a communication when this reference is paid\")"
+  },
+  "reference_C_isolada": {
+    "reference": "321456",
+    "adminCallback": "http://localhost:9999/dead-unreachable-C",
+    "isolamento": "Criada sozinha, nenhuma outra referência tocada antes ou depois -- elimina a hipótese de A ter sido \"contaminada\" pelo sucesso de B",
+    "marcar_como_paga_1a_tentativa": "Mesmo erro: \"Ocorreu um erro! O estado da referência não foi alterado.\"",
+    "acao_seguinte": "Só um refresh (botão \"Consultar\", sem tocar na referência de novo)",
+    "resultado": "Estado já \"Paga\" -- confirmado por print do backoffice"
+  },
+  "conclusao": "O erro da UI ao marcar como paga com adminCallback inalcançável é cosmético -- a EuPago tenta notificar sincronamente como parte da própria ação da UI, e se falhar mostra o erro, mas o estado do lado deles já mudou. Um refresh simples revela isso. adminCallback NÃO é necessário para a confirmação funcionar -- confirma a doc oficial (\"optional field to receive a communication when this reference is paid\"), e contradiz o achado anterior de 2026-08-14 (correlação mal interpretada, nunca se tinha tentado um refresh antes de concluir que o estado não tinha mudado)."
+}

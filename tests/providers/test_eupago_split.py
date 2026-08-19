@@ -51,6 +51,24 @@ def test_successful_split_payment() -> None:
 
 
 @responses.activate
+def test_admin_callback_omitted_from_payload_when_not_given() -> None:
+    """✅ Confirmado com um teste controlado real em sandbox (2026-08-19): adminCallback é
+    puramente uma notificação opcional ("receive a communication when this reference is
+    paid", doc oficial), sem qualquer efeito na confirmabilidade da referência mesmo quando
+    inalcançável -- ver docs/providers/eupago-mbway.md. Omitir é o caminho recomendado."""
+    responses.add(responses.POST, URL, json={"transactionStatus": "Success"}, status=200)
+    result = create_split_payment(
+        api_key="K",
+        method="mbway",
+        identifier="id",
+        amount=Money(Decimal("20.00")),
+        beneficiaries=_beneficiaries(),
+        environment=Environment.SANDBOX,
+    )
+    assert "adminCallback" not in result.call.request
+
+
+@responses.activate
 def test_beneficiary_extern_key_never_appears_in_audit_request() -> None:
     """Corrige o bug original: bookwey/utils.py:210 despejava externKey em claro via
     print(payload) — ver docs/PLAN.md e docs/SECURITY.md regra 3."""

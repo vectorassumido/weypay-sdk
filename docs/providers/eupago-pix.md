@@ -25,16 +25,19 @@ Marcação: ✅ verificado / ⚠️ a confirmar. Fonte primária:
 }
 ```
 
-✅ **Resolvido (Fase 0b, observação direta em sandbox, 2026-08-14)**:
-`bookwey/booksys-be/integrations/payments/utils.py:255-266` envia, dentro de `payment{}`,
-`successUrl`, `failUrl` e `backUrl`, nenhum dos quais consta da especificação documentada
-publicamente. Testado com um pedido idêntico com e sem esses três campos
-(`docs/observed/eupago_pix_with_urls.json` / `eupago_pix_without_urls.json`): **ambos
-devolvem `HTTP 201` com exatamente a mesma forma de resposta** (`transactionStatus`,
-`transactionID`, `reference`, `pixCode`, `pixImage`) — os campos são **aceites, sem erro**,
-hipótese (1) confirmada. Não há confirmação de que sejam *usados* (não são ecoados na
-resposta), só de que não quebram o pedido — comportamento suficiente para a Fase 3 manter o
-código como está.
+✅ **Resolvido definitivamente (2026-08-19)**, substitui a conclusão parcial de 2026-08-14
+(Fase 0b): `bookwey/booksys-be/integrations/payments/utils.py` enviava, dentro de `payment{}`,
+`successUrl`, `failUrl` e `backUrl`. Fase 0b já tinha testado que são **aceites sem erro**
+(`docs/observed/eupago_pix_with_urls.json` / `eupago_pix_without_urls.json`, `HTTP 201`
+idêntico com e sem eles), mas não confirmava se eram sequer reconhecidos. **Confirmado agora
+que não são**: extraído o schema OpenAPI completo embutido na doc oficial
+(`eupago.readme.io/reference/europix`, todos os parâmetros de todos os endpoints na página —
+dezenas de campos, incluindo `payment{identifier,amount}`/`customer{name,email,...,notify}` da
+EuroPix) e **nenhum campo chamado `successUrl`/`failUrl`/`backUrl` existe em lado nenhum** —
+nem na EuroPix nem em qualquer outro endpoint da mesma página. Existe um campo parecido,
+`url_retorno`, mas pertence ao Paysafecard, produto diferente. Uma API REST tipicamente
+ignora campos desconhecidos do corpo — consistente com o `HTTP 201` idêntico observado em
+2026-08-14. **Removidos do `bookwey` e do admin** (2026-08-19) — nunca fizeram nada.
 
 ## (c) Response — verbatim
 

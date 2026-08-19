@@ -5,6 +5,16 @@ Versionamento semântico. Os projetos consumidores fixam sempre uma tag exata.
 
 ## [Não lançado]
 
+### v0.4.0 — EuPago: `admin_callback` do split passa a opcional
+- `providers/eupago/split.create_split_payment()`: `admin_callback` deixa de ser
+  obrigatório (default `""`, só enviado se dado). Confirmado com um teste controlado real em
+  sandbox que a EuPago não exige que seja alcançável para a referência ficar confirmável —
+  corrige um achado errado de 2026-08-14. Ver `docs/providers/eupago-mbway.md`,
+  `docs/observed/eupago_split_admincallback_unreachable_is_cosmetic.json`.
+- `docs/providers/eupago-pix.md`: confirmado (schema OpenAPI oficial completo) que
+  `successUrl`/`failUrl`/`backUrl` não existem em nenhum endpoint documentado da EuPago —
+  nunca tiveram efeito nenhum.
+
 ### v0.3.0 — ifthenpay: fallback de reconciliação para PINPAY
 - `providers/ifthenpay/pinpay.get_order_status()` — usa a API oficial "List of Payments REST"
   (`POST /v2/payments/read`), documentada pela ifthenpay como alternativa/complemento ao

@@ -153,23 +153,28 @@ campo de estado por pagamento** — o endpoint só lista pagamentos **concluído
 significa pago; a ausência não distingue "ainda pendente" de "`orderId` nunca existiu" (a
 própria API não faz essa distinção).
 
-**Bloqueio real, não resolvido**: exige `boKey` — "key provided by ifthenpay when signing the
-contract" / "Backoffice key that identifies the merchant account" (visto também como campo
-obrigatório da API de ativação de callback por API, `POST /callback/activation`, não usada
-esta sessão porque o callback já foi ativado manualmente no backoffice — ver (i) acima). É
-uma credencial **distinta** da `gateway_key` (cria o pagamento) e da chave anti-phishing
-(valida o callback). ⚠️ Onde/como obtê-la não foi confirmado — possivelmente o campo "Chave
-de Backoffice" visto mascarado no modal "Ativação de Callback" do backoffice, nunca preenchido
-nem lido esta sessão (nunca se lê nem transporta uma credencial real — ver regra 6 da skill
-`weypay-phase`). Ver `docs/OPEN-QUESTIONS.md` #26.
+**Credencial `boKey` — resolvida (2026-08-19).** Exige `boKey` — "key provided by ifthenpay
+when signing the contract" / "Backoffice key that identifies the merchant account" (visto
+também como campo obrigatório da API de ativação de callback por API, `POST
+/callback/activation`, não usada porque o callback já foi ativado manualmente no backoffice —
+ver (i) acima). É uma credencial **distinta** da `gateway_key` (cria o pagamento) e da chave
+anti-phishing (valida o callback). O utilizador obteve o valor de produção e configurou-o no
+admin local em `Merchant.ifthenpay_bo_key`. Ver `docs/OPEN-QUESTIONS.md` #26.
 
-**Implementado e testado** (fixtures a partir do schema documentado, sem credencial real —
-mesmo padrão usado para todo o SDK antes de validação em sandbox/produção real):
+**✅ Validado com duas chamadas reais contra produção** (2026-08-19), reconsultando as
+referências PINPAY já pagas em sessões anteriores (`199928337085928`, Apple Pay;
+`635946335693568`, Google Pay — ambas €0,01): as duas devolveram `PaymentStatus.PAID`, com
+todos os campos documentados presentes e sem `403 Invalid boKey`. Ver
+`docs/observed/ifthenpay_list_of_payments_paid.json`. Observação lateral, não um bug: para um
+pagamento de teste tão pequeno, `netAmount` sai negativo (`fee` fixa de €0,24 > `amount` de
+€0,01) — aritmética esperada, não teria este efeito numa reserva real.
+
+**Implementado, testado e validado**:
 `weypay/providers/ifthenpay/pinpay.py::get_order_status(*, bo_key, order_id, ...)`, `v0.3.0`.
-**Não ligado a nenhum consumidor em modo ativo** — `bookwey` ganhou o campo aditivo
-`Merchant.ifthenpay_bo_key` (em branco por omissão) e uma chamada condicional em
-`check_payment_status` que só corre se o campo estiver preenchido; com o campo vazio (estado
-atual, em todos os merchants), o comportamento fica exatamente como estava — sem regressão.
+**Ligado no `bookwey`, ativo neste merchant** — `Merchant.ifthenpay_bo_key` (aditivo,
+em branco por omissão nos restantes) e uma chamada condicional em `check_payment_status` que
+só corre se o campo estiver preenchido; nos merchants sem o campo preenchido, o comportamento
+continua exatamente como estava — sem regressão.
 
 ## (g) Delta a corrigir
 

@@ -84,6 +84,44 @@ LIST_URL = "https://api.ifthenpay.com/v2/payments/read"
 
 
 @responses.activate
+def test_get_order_status_matches_a_real_production_response_shape() -> None:
+    """Espelha docs/observed/ifthenpay_list_of_payments_paid.json — resposta real de produção
+    (2026-08-19), reconsultando um pagamento PINPAY (Apple Pay, €0,01) já confirmado numa
+    sessão anterior. Confirma boKey válido (não 403) e o shape exato de um pagamento real."""
+    order_id = "199928337085928"
+    responses.add(
+        responses.POST,
+        LIST_URL,
+        json={
+            "message": "OK",
+            "status": 200,
+            "payments": [
+                {
+                    "amount": 0.01,
+                    "entity": "APPLE",
+                    "fee": 0.24,
+                    "netAmount": -0.23,
+                    "orderId": order_id,
+                    "paymentDate": "18-08-2026 22:05:56",
+                    "procDate": "20260819",
+                    "reference": order_id,
+                    "requestId": "AdUw3bki5g814Ztxle2Q",
+                    "subEntity": "UND-423171",
+                    "terminal": "12-VISA-PRT",
+                }
+            ],
+        },
+        status=200,
+    )
+
+    status, payment = pinpay.get_order_status(bo_key=BO_KEY, order_id=order_id)
+
+    assert status == PaymentStatus.PAID
+    assert payment["entity"] == "APPLE"
+    assert payment["amount"] == 0.01
+
+
+@responses.activate
 def test_get_order_status_paid_when_order_id_present_in_the_list() -> None:
     responses.add(
         responses.POST,

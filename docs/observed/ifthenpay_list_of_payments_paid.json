@@ -1,0 +1,21 @@
+{
+  "_nota": "Resposta real de produção (2026-08-19), POST https://api.ifthenpay.com/v2/payments/read, orderId de um pagamento PINPAY (Apple Pay) real de €0,01 feito numa sessão anterior. boKey redigido -- nunca gravado em claro.",
+  "request": {
+    "boKey": "***",
+    "orderId": "199928337085928"
+  },
+  "response": {
+    "amount": 0.01,
+    "entity": "APPLE",
+    "fee": 0.24,
+    "netAmount": -0.23,
+    "orderId": "199928337085928",
+    "paymentDate": "18-08-2026 22:05:56",
+    "procDate": "20260819",
+    "reference": "199928337085928",
+    "requestId": "AdUw3bki5g814Ztxle2Q",
+    "subEntity": "UND-423171",
+    "terminal": "12-VISA-PRT"
+  },
+  "_observacao": "netAmount negativo -- a fee fixa (0.24) excede o amount (0.01) num pagamento de teste tão pequeno. Não é um bug, é aritmética esperada para valores de teste muito abaixo de qualquer transação real; não teria este efeito numa reserva normal."
+}

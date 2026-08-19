@@ -116,8 +116,10 @@ def get_order_status(
 
     Requer ``bo_key`` — "key provided by ifthenpay when signing the contract", credencial
     distinta da ``gateway_key`` (usada para criar o pagamento) e da chave anti-phishing
-    (usada para validar o callback). ⚠️ Ainda não confirmado onde/como obter esta chave —
-    ver docs/OPEN-QUESTIONS.md.
+    (usada para validar o callback). ✅ Confirmado com duas chamadas reais contra produção
+    (2026-08-19), reconsultando referências PINPAY já pagas de sessões anteriores: devolveu
+    ``PaymentStatus.PAID`` para ambas, com todos os campos documentados presentes. Ver
+    docs/OPEN-QUESTIONS.md #26.
 
     A resposta não tem um campo de estado por pagamento: o endpoint só lista pagamentos
     **concluídos** (documentado explicitamente), portanto a presença de um item com o

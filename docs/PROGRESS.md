@@ -5,6 +5,21 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
+- **2026-08-19 — auditoria "verificação está blindada?" — `boxwey` tinha um buraco real,
+  agora fechado.** O utilizador pediu para confirmar se algum job periódico reconcilia
+  pagamentos que o callback/webhook não confirma, nos dois SaaS, para os dois gateways.
+  Resultado da auditoria: `bookwey` já tem `reconcile_pending_payments` (5 em 5 min, cobre
+  EuPago sempre, PINPAY só se `ifthenpay_bo_key` estiver preenchido — ver acima). **`boxwey`
+  não tinha nenhum job de reconciliação** — só `expire_orders`, que fazia um `UPDATE` cego
+  (`PENDING`→`EXPIRED`) sem verificar nada junto da ifthenpay; e o polling de estado
+  (`OrderStatusView`) também só lê a BD. Se o webhook falhasse uma vez, uma encomenda paga
+  ficava `EXPIRED` para sempre, sem recuperação automática. Corrigido: `events/services/
+  payments.py::reconcile_pending_order()`/`reconcile_pending_orders()`, usando
+  `mbway.get_order_status()` (já validado com pagamentos reais, nunca antes chamado no
+  `boxwey`) — ligado no comando `expire_orders` existente (mesmo agendamento, sem alterar o
+  cron), reconcilia antes de expirar. `boxwey` commit `1408747` em `weypay-sdk-migration`,
+  219/219 testes (era 209). `bookwey` inalterado nesta parte.
+
 - **2026-08-19 — utilizador de volta: `boKey` obtido, SDK publicado `v0.3.0`.** Configurou
   `Merchant.ifthenpay_bo_key` no admin local (merchant `salao-beleza-viva`) — validado com
   duas chamadas reais a `get_order_status()` contra pagamentos PINPAY já pagos (`docs/

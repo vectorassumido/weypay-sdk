@@ -5,6 +5,21 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
+- **2026-08-19 — utilizador de volta: `boKey` obtido, SDK publicado `v0.3.0`.** Configurou
+  `Merchant.ifthenpay_bo_key` no admin local (merchant `salao-beleza-viva`) — validado com
+  duas chamadas reais a `get_order_status()` contra pagamentos PINPAY já pagos (`docs/
+  OPEN-QUESTIONS.md` #26, resolvida). Investigada também a #6 (vocabulário de recusa/
+  reembolso do callback ifthenpay): três vias tentadas com um pagamento PINPAY real de
+  €0,01 (Apple Pay) — Webhook Tester (é só um verificador de formato, não simula eventos),
+  recusa nativa (não disponível no ecrã), timeout (não existe sem `expiredate`), desativar o
+  link no backoffice (ação administrativa, não dispara callback — confirmado). Sem sucesso,
+  documentado como tentativas esgotadas; não bloqueia (`parse_status` já cai em `UNKNOWN`
+  com segurança). SDK `v0.3.0` publicado (`git push` main + tag, `github.com/vectorassumido/
+  weypay-sdk`), `requirements.txt` de `bookwey` e `boxwey` atualizados e verificados com
+  instalação real (não editable) + suite completa (`bookwey` 136/136, `boxwey` 209/209) antes
+  de commitar em `weypay-sdk-migration` (nenhum dos dois consumidores tocou em `main` nem foi
+  `push`ado — decisão de merge fica com o utilizador).
+
 - **2026-08-19 — sessão autónoma concluída, loop parado.** As duas tarefas explícitas ficaram
   feitas: `_has_slot_conflict()` corrigido (`bookwey` commit `0a55f6d`) e os dois URLs
   ifthenpay investigados até ao fim — encontrado `ifthenpay.pinpay.get_order_status()`

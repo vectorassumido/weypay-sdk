@@ -110,7 +110,7 @@ naturalmente um reembolso/recusa real, ou o utilizador quiser contactar o suport
 | # | Questão | Bloqueia |
 |---|---|---|
 | 8 | Callback real de ponta a ponta (gateway → máquina local) — precisa de túnel público e URL registado no backoffice | Nível 3 de `LOCAL-TESTING.md`, explicitamente fora do que a execução autónoma garante |
-| 9 | Garantir `[VALOR]` no template de callback ifthenpay de todas as contas — mudança de configuração, não de código | Fase 4 |
+| ~~9~~ | **Resolvida (2026-08-19).** Confirmado pelo utilizador: `[VALOR]` presente nos três templates reais em produção — `APPLE`/`GOOGLE` (`bookwey`) e `MBWAY` (`boxwey`), todos com `?chave=[ANTI_PHISHING_KEY]&referencia=[REFERENCIA]&valor=[VALOR]&estado=[ESTADO]`. | — |
 
 ## SIBS — bloqueadas por falta de contrato (Fase 5, fora do âmbito autónomo)
 

@@ -71,12 +71,39 @@ verdadeiramente parada sem esta informação — registar aqui e em `PROGRESS.md
 | # | Questão | Gateway/doc | Como resolver | Bloqueia |
 |---|---|---|---|---|
 | 4 | `chave_api` do Webhook 1.0 é mesmo o mecanismo de verificação, ou só está documentado como "a chave usada para criar a referência"? | `eupago-webhooks.md` | **Deprioritizada (2026-08-18)**: o `bookwey` vai direto para Webhooks 2.0 (assinatura `X-Signature`, verificável de facto), que torna esta pergunta sobre o 1.0 irrelevante para a decisão de arquitetura. Não resolvida, mas deixou de bloquear. | — |
-| 6 | Que valores textuais de `[ESTADO]` chegam ao callback ifthenpay além de `PAGO`? Existe callback de recusa/cancelamento? | `ifthenpay-callbacks.md` | **Webhook Tester** oficial no backoffice ifthenpay | Fase 2 (mapear `STATUS_REFUNDED`/`STATUS_DECLINED` corretamente) |
+| 6 | Que valores textuais de `[ESTADO]` chegam ao callback ifthenpay além de `PAGO`? Existe callback de recusa/cancelamento? | `ifthenpay-callbacks.md` | Ver "Tentativas sem sucesso (2026-08-19)" abaixo | Fase 2 (mapear `STATUS_REFUNDED`/`STATUS_DECLINED` corretamente) — não bloqueia (`parse_status` já cai em `UNKNOWN` para qualquer valor não reconhecido, nunca confirma por engano) |
 | ~~7~~ | O `bookwey`/PINPAY já tem algum callback registado no backoffice? Com que nomes de parâmetro? | **Resolvida (2026-08-18), backoffice real verificado com o utilizador.** O callback não é por-produto, é por-CONTA (`APPLE`, `GOOGLE`, `CCARD`, `MBWAY`, ... — cada uma com o seu próprio registo). A conta `MBWAY` já tem o callback real do `boxwey` (produção, `api.boxwey.com`). As contas `APPLE`/`GOOGLE` (as que o PINPAY do `bookwey` usa) **não tinham nenhum callback configurado**. Ver `ifthenpay-pinpay.md` (i). |
 | ~~23~~ | Existe um endpoint de consulta de estado para PINPAY (equivalente ao `EstadoPedidosJSON` do MB WAY)? | **Encontrado (2026-08-19), a partir dos URLs de documentação partilhados pelo utilizador.** A ifthenpay documenta a "List of Payments REST" (`POST https://api.ifthenpay.com/v2/payments/read`), descrita textualmente como "an alternative or complement to the callback (webhook)". Cobre toda a conta (`MB`/`MBWAY`/`PAYSHOP`/`CCARD`/`COFIDIS`/`GOOGLE`/`APPLE`/`PIX`/`TPA`), incluindo explicitamente `GOOGLE`/`APPLE` — as contas que o PINPAY usa. `orderId` no pedido/resposta corresponde exatamente ao `id` enviado em `create_payment` (mesmo limite de 15 carateres). A resposta só lista pagamentos **concluídos** — não tem campo de estado por pagamento; presença do `orderId` pedido = pago. Implementado e testado (fixtures a partir do schema documentado) em `weypay/providers/ifthenpay/pinpay.py::get_order_status()`, `v0.3.0`. **Ainda não usável em produção**: exige a credencial `boKey` (item 26 abaixo), que não temos. Ver `ifthenpay-pinpay.md` (j). |
 | ~~26~~ | Onde/como obter o `boKey` ("Backoffice key that identifies the merchant account")? | **Resolvida (2026-08-19).** O utilizador obteve o valor de produção e configurou-o em `Merchant.ifthenpay_bo_key` no admin local (merchant `salao-beleza-viva`, ainda com os dados de produção por repor). Validado com duas chamadas reais a `get_order_status()` contra as duas referências PINPAY reais já pagas em sessões anteriores (`199928337085928`, `635946335693568`) — ambas devolveram `PaymentStatus.PAID` com todos os campos documentados presentes, confirmando tanto a validade da chave (não `403 Invalid boKey`) como a implementação. Ver `docs/observed/ifthenpay_list_of_payments_paid.json`. | `ifthenpay-pinpay.md` (j) | — | — |
 | ~~24~~ | **Resolvida (2026-08-18), corrigido um achado inicial errado**: pagamento PINPAY real (Apple Pay e Google Pay, €0,01) confirmado pago do lado da ifthenpay; `Payment` local ficou `"pending"` — mas **não por falta de mecanismo**. Causa real: `success_url`/`front_domain` aponta para `http://salao-beleza-viva.localhost:3000`, inalcançável do dispositivo do teste (mesma classe do `adminCallback` EuPago) — a página que faz *polling* de `check_payment_status` nunca carregou. Invocado manualmente para a mesma referência: `status` passa a `"confirmed"` de imediato. **O mecanismo funciona quando chamado**; não diz nada de novo sobre #7/#23, que continuam genuinamente em aberto. | `ifthenpay-pinpay.md` (f) | — | — |
 | ~~25~~ | **Resolvida (2026-08-18/19), com um bug real encontrado e corrigido.** `/api/webhooks/eupago/` validado com um pagamento MB WAY real de €1,00 em produção (canal configurado no backoffice, túnel `cloudflared`). A documentação estava errada: o campo principal chama-se `transaction` (singular), não `transactions` (plural) — causou 3 falhas reais de entrega antes de ser descoberto (o código não guardava o corpo em falhas de parsing; corrigido, e é isso que permitiu ver o payload real). `status: "Paid"` confirmado exatamente como documentado. Ver `docs/providers/eupago-webhooks.md`, `docs/observed/eupago_webhook_paid.json`. | `eupago-webhooks.md` | — | — |
+
+### Questão #6 — tentativas sem sucesso (2026-08-19)
+
+Três vias tentadas para observar um valor de `[ESTADO]` de recusa/cancelamento no callback
+PINPAY (conta `APPLE`), todas sem produzir sinal:
+
+1. **"Webhook Tester"** (`ifthenpay.com/docs/tools/webhook-tester/`) — não é um simulador de
+   eventos reais, é um verificador de formato/alcançabilidade: faz um `GET` ao URL fornecido
+   **sem substituir nenhum placeholder** (confirmado: o pedido capturado trouxe os tokens
+   `[ANTI_PHISHING_KEY]`, `[ID_TRANSACTION]`, etc. literais, por substituir). Não serve para
+   observar valores reais de estado.
+2. **Recusa nativa no ecrã de pagamento** — a página Apple Pay/Google Pay do PINPAY não
+   apresenta nenhum botão de cancelar/recusar; só o botão "back" do browser.
+3. **Timeout deliberado** — sem `expiredate` definido na criação (campo opcional, deixado em
+   branco tal como o resto do SDK faz por omissão), o link não expira sozinho num período
+   observável; o backoffice confirma "Url de Expiração: -" no registo.
+4. **Desativar o link no backoffice** (checkbox "Ativo" → "Gravar", equivalente à API
+   `POST /{GATEWAY_KEY}/disable`) — ação puramente administrativa, confirmado **não dispara
+   nenhum callback** (nenhuma entrada nova em `GatewayCallLog` depois de desativar um link de
+   teste real, €0,01, conta `APPLE`).
+
+Testado com um pagamento PINPAY real (€0,01, Apple Pay, merchant `salao-beleza-viva`, túnel
+`cloudflared` temporário na conta `APPLE`, revertido para `api.bookwey.com` no fim). Ficou por
+tentar: um reembolso real depois de um pagamento completo, ou contacto direto com o suporte
+ifthenpay. Não vale o esforço/risco agora — `parse_status()` já falha em segurança (`UNKNOWN`
+para qualquer valor não reconhecido, nunca confirma por engano); resolver quando surgir
+naturalmente um reembolso/recusa real, ou o utilizador quiser contactar o suporte.
 
 ## Não resolúveis sem o utilizador (túnel público ou registo em backoffice)
 

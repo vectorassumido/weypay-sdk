@@ -5,6 +5,23 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
+- **2026-08-19 — DEPLOY REAL FEITO E VALIDADO. Migração concluída.**
+  `booksys-be` (`bookwey-prod`) → `v0.3.0`, `api` (`boxwey-prod`) → `v0.2.0`, ambos em
+  Cloud Run, zero downtime, migrações de produção aplicadas (9 no bookwey — incl.
+  `ifthenpay_bo_key`/`eupago_webhook_signing_key`; 2 no boxwey — incl. a tabela nova
+  `integrations.GatewayCallLog`). Dois bugs reais só descobertos no deploy: Dockerfiles sem
+  `git` (bloqueava o `pip install` do `weypay`, corrigido nos dois) e `DJANGO_ALLOWED_HOSTS`
+  incompleto no `bookwey` (faltava um dos dois aliases `*.run.app` do Cloud Run — corrigido
+  no env var do serviço). Confirmado ao vivo: `/api/pagamento-callback/<uuid>/` já devolve
+  404 (falha de segurança fechada em produção real), webhooks novos respondem.
+  **Confirmado pelo utilizador, com registo explícito**: configurou no admin de produção do
+  `bookwey` a chave de backoffice ifthenpay (`ifthenpay_bo_key`), a chave anti-phishing
+  ifthenpay (`ifthenpay_callback_key`) e a chave de assinatura dos Webhooks 2.0 EuPago
+  (`eupago_webhook_signing_key`) — e testou com sucesso, pagamentos reais: MB WAY
+  (`bookwey`, merchant `vectorassumido`), Apple Pay (`bookwey`, merchant `vectorassumido`),
+  MB WAY (`boxwey`, tenant `shekinah`). Migração `weypay-sdk` completa e validada
+  ponta-a-ponta em produção real.
+
 - **2026-08-19 — auditoria "verificação está blindada?" — `boxwey` tinha um buraco real,
   agora fechado.** O utilizador pediu para confirmar se algum job periódico reconcilia
   pagamentos que o callback/webhook não confirma, nos dois SaaS, para os dois gateways.

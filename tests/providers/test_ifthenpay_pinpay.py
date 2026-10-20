@@ -66,6 +66,64 @@ def test_description_truncated_to_200_chars() -> None:
 
 
 @responses.activate
+def test_optional_extra_fields_are_sent_when_given() -> None:
+    """backlog-ideias#25: btn_close_url/btn_close_label/otp/selected_method, já enviados hoje
+    pelo p8a — ver docs/providers/ifthenpay-pinpay.md (k)."""
+    responses.add(responses.POST, URL, json={"RedirectUrl": "https://x"}, status=200)
+
+    pinpay.create_payment(
+        gateway_key=GATEWAY_KEY,
+        id="1",
+        amount=Money(Decimal("1")),
+        btn_close_url="https://example.pt",
+        btn_close_label="Fechar",
+        otp=True,
+        selected_method="2",
+    )
+
+    import json as _json
+
+    request_body = responses.calls[0].request.body
+    assert request_body is not None
+    sent = _json.loads(request_body)
+    assert sent["btnCloseUrl"] == "https://example.pt"
+    assert sent["btnCloseLabel"] == "Fechar"
+    assert sent["otp"] == "true"
+    assert sent["selected_method"] == "2"
+
+
+@responses.activate
+def test_otp_false_is_sent_as_the_string_false() -> None:
+    responses.add(responses.POST, URL, json={"RedirectUrl": "https://x"}, status=200)
+
+    pinpay.create_payment(gateway_key=GATEWAY_KEY, id="1", amount=Money(Decimal("1")), otp=False)
+
+    import json as _json
+
+    request_body = responses.calls[0].request.body
+    assert request_body is not None
+    sent = _json.loads(request_body)
+    assert sent["otp"] == "false"
+
+
+@responses.activate
+def test_optional_extra_fields_absent_when_not_given() -> None:
+    responses.add(responses.POST, URL, json={"RedirectUrl": "https://x"}, status=200)
+
+    pinpay.create_payment(gateway_key=GATEWAY_KEY, id="1", amount=Money(Decimal("1")))
+
+    import json as _json
+
+    request_body = responses.calls[0].request.body
+    assert request_body is not None
+    sent = _json.loads(request_body)
+    assert "btnCloseUrl" not in sent
+    assert "btnCloseLabel" not in sent
+    assert "otp" not in sent
+    assert "selected_method" not in sent
+
+
+@responses.activate
 def test_missing_redirect_url_raises_gateway_rejected() -> None:
     responses.add(responses.POST, URL, json={"PinCode": "123"}, status=200)
     with pytest.raises(GatewayRejected):

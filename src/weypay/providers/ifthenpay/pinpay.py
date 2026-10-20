@@ -33,6 +33,10 @@ def create_payment(
     error_url: str | None = None,
     cancel_url: str | None = None,
     expire_date: str | None = None,
+    btn_close_url: str | None = None,
+    btn_close_label: str | None = None,
+    otp: bool | None = None,
+    selected_method: str | None = None,
     environment: Environment = Environment.PRODUCTION,
     acknowledge_no_sandbox: bool = False,
 ) -> PaymentResult:
@@ -40,6 +44,14 @@ def create_payment(
 
     ``id`` tem de ser numérico com no máximo 15 caracteres (limite do protocolo — ver
     docs/providers/ifthenpay-pinpay.md (b)); ``description`` é truncada a 200 caracteres.
+
+    ✅ Campos confirmados na especificação OpenAPI oficial "PAY BY LINK & PIN PAY - REST"
+    (`ifthenpay.com/docs/en/api/pbl/`, backlog-ideias#25) — já enviados hoje pelo `p8a`:
+    ``btn_close_url``/``btn_close_label`` (URL e texto do botão de fechar o checkout), ``otp``
+    (liga a opção "One-Time Payment" — o link fica inativo depois do primeiro pagamento, enviado
+    como ``"true"``/``"false"``), ``selected_method`` (pré-seleciona o método de pagamento
+    mostrado ao comprador: ``"1"`` Multibanco, ``"2"`` MB WAY, ``"3"`` Payshop, ``"4"`` cartão,
+    ``"8"`` PIX).
     """
     if not id or len(id) > ID_MAX_LENGTH or not id.isdigit():
         raise ValueError(
@@ -66,6 +78,14 @@ def create_payment(
         payload["cancel_url"] = cancel_url
     if expire_date:
         payload["expiredate"] = expire_date
+    if btn_close_url:
+        payload["btnCloseUrl"] = btn_close_url
+    if btn_close_label:
+        payload["btnCloseLabel"] = btn_close_label
+    if otp is not None:
+        payload["otp"] = "true" if otp else "false"
+    if selected_method:
+        payload["selected_method"] = selected_method
 
     data, call = perform_request(
         method="POST",

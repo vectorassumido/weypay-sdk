@@ -26,6 +26,10 @@ agrega vários métodos (MB WAY, cartão, Apple Pay, Google Pay) atrás de um ú
 | `success_url` | não | URL de redirect em sucesso |
 | `error_url` | não | URL de redirect em erro |
 | `cancel_url` | não | URL de redirect em cancelamento |
+| `btnCloseUrl` | não | URL do botão de fechar o checkout |
+| `btnCloseLabel` | não | string, texto do botão de fechar |
+| `otp` | não | `"true"`\|`"false"` — liga a opção "One-Time Payment": o link fica inativo depois do primeiro pagamento |
+| `selected_method` | não | pré-seleciona o método mostrado ao comprador: `"1"` Multibanco, `"2"` MB WAY, `"3"` Payshop, `"4"` cartão, `"8"` PIX |
 
 `bookwey/booksys-be/integrations/payments/utils.py:325-343` usa `id`, `amount`, `description`
 (truncado a 200 — ✅ correto), `lang`, `success_url`, `accounts`. **Não usa** `error_url` nem
@@ -176,6 +180,26 @@ em branco por omissão nos restantes) e uma chamada condicional em `check_paymen
 só corre se o campo estiver preenchido; nos merchants sem o campo preenchido, o comportamento
 continua exatamente como estava — sem regressão.
 
+## (k) Campos opcionais extra — `btnCloseUrl`, `btnCloseLabel`, `otp`, `selected_method` (2026-10-20)
+
+✅ **Confirmados na especificação OpenAPI oficial** "PAY BY LINK & PIN PAY - REST" v1.0
+(`ifthenpay.com/docs/en/api/pbl/` → `openapi.yaml`, referenciado no HTML da página mas não
+servido diretamente — mesma situação já descrita em `(j)` para a API "List of Payments REST").
+Decidido em backlog-ideias#25 acrescentá-los ao `create_payment()` porque o `p8a` já os envia
+hoje na sua chamada direta à ifthenpay:
+
+| Campo (protocolo) | Tipo | Descrição (verbatim do spec) |
+|---|---|---|
+| `btnCloseUrl` | string | "URL for the close/back button" |
+| `btnCloseLabel` | string | "Label for the close/back button" |
+| `otp` | string, enum `"true"`\|`"false"` | "enables the One-Time Payment option, allowing the link to be used for a single payment before it becomes inactive" |
+| `selected_method` | string, enum `1`-`4`,`8` | "code of the selected payment method shown to the customer upon entering the payment gateway" — `1` Multibanco, `2` MB WAY, `3` Payshop, `4` cartão de crédito, `8` PIX |
+
+`create_payment()` expõe os quatro como opcionais em `snake_case` Python (`btn_close_url`,
+`btn_close_label`, `otp: bool | None`, `selected_method`), convertendo `otp` para a string
+`"true"`/`"false"` que o protocolo exige — os outros três vão tal e qual para o campo do
+protocolo correspondente.
+
 ## (g) Delta a corrigir
 
 - Nada no protocolo — a chamada de criação está correta.
@@ -185,4 +209,5 @@ continua exatamente como estava — sem regressão.
 ## (h) Fonte
 
 [API - PayByLink & PINPAY](https://helpdesk.ifthenpay.com/en/support/solutions/articles/79000143271-api-paybylink-pinpay) ·
-[What is PINPAY?](https://helpdesk.ifthenpay.com/en/support/solutions/articles/79000142861-what-is-pinpay-)
+[What is PINPAY?](https://helpdesk.ifthenpay.com/en/support/solutions/articles/79000142861-what-is-pinpay-) ·
+[PAY BY LINK & PIN PAY - REST (OpenAPI)](https://ifthenpay.com/docs/en/api/pbl/)

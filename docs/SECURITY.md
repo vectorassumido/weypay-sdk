@@ -43,7 +43,11 @@ que o comportamento observável não piora.
 5. **Comparação em tempo constante** de toda chave/segredo de callback, sempre —
    `hmac.compare_digest` / `django.utils.crypto.constant_time_compare`. O `boxwey` já o faz
    para a `chave` ifthenpay; a regra generaliza-o a `chave_api` (EuPago) e `X-Signature`
-   (EuPago 2.0) quando forem adotados.
+   (EuPago 2.0) quando forem adotados. **v0.5.0**: cada sistema (`bookwey`, `p8a`, `boxwey`)
+   passa a ter a sua própria conta/chave ifthenpay — já não há partilha entre sistemas — ver
+   `docs/providers/ifthenpay-callbacks.md` (i). O prefixo de sistema na referência
+   (`providers/ifthenpay/reference.py`) é uma defesa adicional, de baixo custo, não um
+   substituto da chave.
 
 6. **Um estado desconhecido no callback nunca devolve 4xx ao gateway.** Mapeia para
    `PaymentStatus.UNKNOWN`, regista em auditoria, responde 200. Devolver 400 (como o `boxwey`
@@ -96,7 +100,7 @@ resolveria um problema que nenhum dos dois consumidores tem hoje.
 
 | Gateway | Mecanismo de verificação | Estado real (antes desta migração) |
 |---|---|---|
-| ifthenpay | Chave anti-phishing (segredo partilhado, tempo constante) + verificação de valor | `boxwey`: correto. `bookwey`/PINPAY: **inexistente** — confirma sem verificar nada |
+| ifthenpay | Chave anti-phishing (segredo partilhado, tempo constante) + verificação de valor + prefixo de sistema na referência (defesa adicional, v0.5.0 — ver `docs/providers/ifthenpay-callbacks.md` (i)) | `boxwey`: correto. `bookwey`/PINPAY: **inexistente** — confirma sem verificar nada |
 | EuPago 1.0 | `chave_api` (⚠️ inferido, não documentado como mecanismo de segurança — ver `providers/eupago-webhooks.md`) | `bookwey`: **ignorado por completo** |
 | EuPago 2.0 | HMAC-SHA256 em `X-Signature`, verificável de facto | Não adotado por nenhum projeto ainda |
 | SIBS | AES-256-GCM (confidencialidade + integridade via tag de autenticação) | Não implementado — Fase 5 |

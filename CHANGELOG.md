@@ -5,6 +5,25 @@ Versionamento semântico. Os projetos consumidores fixam sempre uma tag exata.
 
 ## [Não lançado]
 
+### v0.5.0 — ifthenpay: referências com prefixo de sistema
+- Novo `providers/ifthenpay/reference.py`: `SYSTEM_PREFIXES` (`71` bookwey, `72` p8a, `73`
+  boxwey), `new_reference(system)` (15 dígitos: prefixo + aleatórios via `secrets`),
+  `has_prefix(reference, system)`. Decidido em backlog-ideias#25, depois de a ifthenpay
+  confirmar por escrito que não há fan-out de callback (uma conta só tem um endereço) — cada
+  sistema passa a ter a sua própria conta ifthenpay, e o prefixo fica como defesa adicional de
+  baixo custo, não como mecanismo de pertença entre contas partilhadas.
+- `providers/ifthenpay/mbway.request_payment()`: valida que `reference` não é vazia e tem no
+  máximo 15 caracteres (`ValueError` caso contrário); lê `IdPedido` **ou** `idPedido` na
+  resposta. `channel`/`canal` fica fixo em `"03"` — decisão explícita do Product Triage de não
+  o expor como argumento variável por chamada, documentada em
+  `docs/providers/ifthenpay-mbway.md` (i).
+- `providers/ifthenpay/pinpay.create_payment()`: aceita os opcionais `btn_close_url`,
+  `btn_close_label`, `otp` e `selected_method`, confirmados na especificação OpenAPI oficial do
+  PINPAY — já usados hoje pelo `p8a` na sua chamada direta.
+- Mudança aditiva: os testes existentes passam sem alterações.
+- Ver `docs/providers/ifthenpay-callbacks.md` (i)/(j) para o modelo "uma conta ifthenpay por
+  sistema, um callback por conta" e os dois templates de callback (legado vs. novo).
+
 ### v0.4.0 — EuPago: `admin_callback` do split passa a opcional
 - `providers/eupago/split.create_split_payment()`: `admin_callback` deixa de ser
   obrigatório (default `""`, só enviado se dado). Confirmado com um teste controlado real em

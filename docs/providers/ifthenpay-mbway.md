@@ -178,6 +178,27 @@ ifthenpay só via PINPAY (`ifthenpay-pinpay.md`).
   fizer — é grátis e elimina uma classe de falha.
 - Backlog (fora desta migração): avaliar migração para MB WAY v2 REST.
 
+## (i) `channel`/`canal` fica fixo — decisão explícita, não esquecimento (v0.5.0, 2026-10-19)
+
+✅ **Decisão do Product Triage** (backlog-ideias#25): ao desenhar a migração do `p8a` para o
+SDK, considerou-se expor `canal` (`CHANNEL` em `mbway.py`) como argumento variável por chamada.
+Decidiu-se que não — nenhum caso de uso dos 3 sistemas consumidores (`bookwey`, `p8a`,
+`boxwey`) precisa de outro canal que não `"03"`. Fica um constante do módulo, documentada aqui,
+e não um parâmetro de `request_payment()`. Se um caso de uso futuro precisar de outro canal,
+isto tem de ser revisitado explicitamente — não assumir que `"03"` serve sempre.
+
+## (j) `reference` validada, e `IdPedido`/`idPedido` aceites como alternativas (v0.5.0)
+
+✅ **Confirmado pela ifthenpay** (backlog-ideias#25, 2026-10-20): `referencia`/`orderId` vai
+até 15 caracteres em ambos os métodos (MB WAY e PINPAY) — `request_payment()` passou a validar
+isso (`reference` vazia ou com mais de 15 caracteres levanta `ValueError`), em vez de confiar
+em quem chama. `providers/ifthenpay/reference.py` gera referências já dentro do limite, com o
+prefixo de 2 dígitos do sistema consumidor (`new_reference(system)`).
+
+`request_payment()` lê `IdPedido` **ou** `idPedido` na resposta — a mesma categoria de
+divergência de grafia já vista nesta API (`MbWayKey`/`mbWayKey`, `EstadoPedidosJson`/
+`EstadoPedidosJSON`, ver (e) acima).
+
 ## (h) Fonte
 
 [API MBWAY (Deprecated)](https://helpdesk.ifthenpay.com/en/support/solutions/articles/79000086376-api-mbway-deprecated-) ·

@@ -88,8 +88,47 @@ exercitar o callback localmente (via túnel) sem depender de um pagamento real �
   implementar a rota, remover a confirmação sem verificação em `check_payment_status`, trocar
   a referência por um token de 15 dígitos aleatórios.
 
+## (i) Modelo definitivo: uma conta ifthenpay por sistema, um callback por conta (v0.5.0, 2026-10-20)
+
+✅ **Confirmado por escrito pela ifthenpay** (backlog-ideias#25): contas adicionais para o
+mesmo NIF/IBAN, uma por sistema, com chave e callback próprios, **sem custos nem limites**
+(pergunta 1) — mas **uma conta só tem um único endereço de callback** (pergunta 2): não há
+fan-out, ao contrário do que um plano anterior deste repo chegou a assumir. Consequência: cada
+sistema (`bookwey`, `p8a`, `boxwey`) passa a ter a sua própria conta por método (MB WAY, Apple
+Pay, Google Pay, cartão), nunca uma partilhada — hoje a chave MB WAY já era partilhada entre o
+`p8a` e o `boxwey`, e essa partilha deixa de se manter à medida que cada sistema migra.
+
+Como já não há chaves partilhadas entre sistemas, a `chave` anti-phishing por si só já garante
+que um callback pertence ao sistema certo — **não precisa de nenhuma verificação adicional do
+lado da referência**. O prefixo de sistema (`providers/ifthenpay/reference.py`,
+`SYSTEM_PREFIXES`) fica mesmo assim, como defesa de baixo custo e independente: se uma conta
+nova for mal configurada (callback apontado para o sistema errado, por engano humano no
+backoffice), o prefixo identifica-se de imediato nos logs/auditoria, sem depender de a chave
+também estar errada. Não é, e nunca foi pensado para ser, um mecanismo de pertença entre contas
+partilhadas — isso dependia do fan-out, que esta resposta da ifthenpay fecha.
+
+## (j) Dois templates de callback — legado (em uso) vs. novo (documentado hoje)
+
+✅ **A documentação atual do MB WAY mostra um template diferente do que as contas existentes
+usam**: `key=[ANTI_PHISHING_KEY]&orderId=[ORDER_ID]&amount=[AMOUNT]&requestId=[REQUEST_ID]&payment_datetime=[PAYMENT_DATETIME]`
+— note a ausência de `estado`/`[ESTADO]`. As contas já configuradas (`boxwey`, produção) usam
+o template **legado**, `chave=[ANTI_PHISHING_KEY]&referencia=[REFERENCIA]&valor=[VALOR]&estado=[ESTADO]`
+(ver `(a)` acima), que é também o default de `CallbackMapping` neste SDK.
+
+**Decisão** (backlog-ideias#25): as contas novas, de cada sistema, configuram-se com o
+template **legado** — igual ao das contas atuais — para não exigir nenhuma mudança de código
+em nenhum dos três consumidores. ⚠️ Fica a confirmar, por conta nova, se o backoffice ainda
+aceita registar esse template (não é o que a documentação atual sugere como padrão); se não
+aceitar, o `CallbackMapping` dessa conta passa a `key`/`orderId`/`amount` — o SDK já suporta
+isso, porque os nomes dos parâmetros em `CallbackMapping` são configuráveis por chamada, nunca
+fixos. ⚠️ Se uma conta ficar mesmo com o template novo, sem `estado`, o pagamento confirma-se
+só pela chegada do callback — o mesmo padrão que o PINPAY já usa (ver `ifthenpay-pinpay.md`
+(e)), nunca por um vocabulário textual que esse template não tem.
+
 ## Fonte
 
 Confirmado em conversa pelo utilizador (template real do `boxwey`) +
 [API - MBWAY (Deprecated)](https://helpdesk.ifthenpay.com/en/support/solutions/articles/79000086376-api-mbway-deprecated-) ·
-[API - PayByLink & PINPAY](https://helpdesk.ifthenpay.com/en/support/solutions/articles/79000143271-api-paybylink-pinpay)
+[API - PayByLink & PINPAY](https://helpdesk.ifthenpay.com/en/support/solutions/articles/79000143271-api-paybylink-pinpay) ·
+[API MB WAY](https://ifthenpay.com/docs/en/api/mbway/#tag/mb-way/POST/mbway) ·
+[Callback guide](https://ifthenpay.com/docs/en/guides/callback/)

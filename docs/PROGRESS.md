@@ -5,6 +5,17 @@ concluído (mais recente no topo), mais o estado corrente.
 
 ## Estado corrente
 
+- **2026-10-20 — v0.5.0: referências com prefixo de sistema (backlog do GitHub Projects,
+  `weypay-sdk#1`, de backlog-ideias#25).** `providers/ifthenpay/reference.py` novo
+  (`SYSTEM_PREFIXES`, `new_reference`, `has_prefix`); `mbway.request_payment()` valida
+  `reference` (não vazia, ≤15 chars) e lê `IdPedido`/`idPedido`; `pinpay.create_payment()`
+  ganha `btn_close_url`/`btn_close_label`/`otp`/`selected_method`, confirmados na spec OpenAPI
+  oficial do PINPAY. `channel` fica fixo, por decisão do Product Triage. Mudança aditiva — 159
+  testes (eram 141), `ruff`/`mypy --strict`/`pytest` verdes. Este cartão e os seguintes
+  (`boxwey`, `bookwey`, `p8a`) passaram a viver no board "Backlog" do GitHub Projects — ver
+  `~/projects/claude-config/backlog/README.md` — em vez deste ficheiro; esta entrada é só um
+  eco para quem ainda lê `PROGRESS.md` em primeiro lugar.
+
 - **2026-08-19 — DEPLOY REAL FEITO E VALIDADO. Migração concluída.**
   `booksys-be` (`bookwey-prod`) → `v0.3.0`, `api` (`boxwey-prod`) → `v0.2.0`, ambos em
   Cloud Run, zero downtime, migrações de produção aplicadas (9 no bookwey — incl.

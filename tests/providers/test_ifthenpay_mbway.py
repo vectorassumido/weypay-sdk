@@ -50,6 +50,65 @@ def test_successful_payment_request() -> None:
 
 
 @responses.activate
+def test_lowercase_id_pedido_is_accepted_as_a_fallback() -> None:
+    """backlog-ideias#25: a resposta pode trazer "idPedido" em vez de "IdPedido" — mesma
+    categoria de divergência de grafia já vista nesta API (ver
+    docs/providers/ifthenpay-mbway.md)."""
+    responses.add(responses.POST, URL, json={"idPedido": "id-456", "Estado": "000"}, status=200)
+
+    result = mbway.request_payment(
+        mbway_key="K",
+        reference="r",
+        amount=Money(Decimal("1")),
+        phone="9",
+        email="a@b.pt",
+        description="d",
+    )
+
+    assert result.provider_payment_id == "id-456"
+
+
+@responses.activate
+def test_uppercase_id_pedido_wins_when_both_are_present() -> None:
+    responses.add(responses.POST, URL, json={"IdPedido": "upper", "idPedido": "lower"}, status=200)
+
+    result = mbway.request_payment(
+        mbway_key="K",
+        reference="r",
+        amount=Money(Decimal("1")),
+        phone="9",
+        email="a@b.pt",
+        description="d",
+    )
+
+    assert result.provider_payment_id == "upper"
+
+
+def test_empty_reference_raises_value_error() -> None:
+    with pytest.raises(ValueError, match="vazia"):
+        mbway.request_payment(
+            mbway_key="K",
+            reference="",
+            amount=Money(Decimal("1")),
+            phone="9",
+            email="a@b.pt",
+            description="d",
+        )
+
+
+def test_reference_longer_than_15_chars_raises_value_error() -> None:
+    with pytest.raises(ValueError, match="15"):
+        mbway.request_payment(
+            mbway_key="K",
+            reference="1" * 16,
+            amount=Money(Decimal("1")),
+            phone="9",
+            email="a@b.pt",
+            description="d",
+        )
+
+
+@responses.activate
 def test_http_error_raises_gateway_rejected_with_call_attached() -> None:
     """.call permite à app auditar/registar mesmo uma chamada rejeitada — ver
     events/services/payments.py::_log_call no boxwey (Fase 2)."""

@@ -11,7 +11,11 @@ from ...errors import GatewayRejected
 from ...http import GatewayEndpoints, perform_request, resolve_base_url
 from ...money import Money
 from ...types import Environment, PaymentResult, PaymentStatus
+from .reference import REFERENCE_MAX_LENGTH
 
+# ✅ Decisão do Product Triage (2026-10-19, backlog-ideias#25): `channel` fica fixo e só
+# documentado, nunca exposto como argumento variável por chamada — nenhum caso de uso dos 3
+# sistemas consumidores (bookwey, p8a, boxwey) precisa de outro canal que não "03".
 CHANNEL = "03"
 DESCRIPTION_MAX_LENGTH = 50
 # ✅ "MbWayKey" confirmado a mesma grafia em SetPedidoJson e EstadoPedidosJSON (chamada real,
@@ -54,7 +58,17 @@ def request_payment(
     porque o código-fonte que este provider substitui (boxwey) também nunca o fez: a
     confirmação real chega sempre pelo callback assíncrono (ver callback.py). ``raw_status``
     leva o código cru para quem quiser interpretar por conta própria.
+
+    ``reference`` não pode ser vazia e tem no máximo ``reference.REFERENCE_MAX_LENGTH``
+    caracteres (✅ confirmado pela ifthenpay, backlog-ideias#25) — use
+    ``reference.new_reference(system)`` para gerar uma com o prefixo do sistema consumidor.
     """
+    if not reference or len(reference) > REFERENCE_MAX_LENGTH:
+        raise ValueError(
+            f"reference não pode ser vazia e tem no máximo {REFERENCE_MAX_LENGTH} caracteres, "
+            f"recebeu {reference!r}"
+        )
+
     base_url = resolve_base_url(
         environment, ENDPOINTS, acknowledge_no_sandbox=acknowledge_no_sandbox
     )
@@ -85,7 +99,11 @@ def request_payment(
             call.http_status or 0, data if data is not None else (call.response or ""), call=call
         )
 
-    payment_id = str(data.get("IdPedido", "") or "")
+    # ✅ "idPedido" (minúsculo) aceite como alternativa a "IdPedido" — backlog-ideias#25 cita a
+    # API MB WAY v2 (`orderId`), que no ecossistema ifthenpay às vezes aparece com outra grafia
+    # consoante a versão/endpoint (o mesmo já tinha acontecido com "MbWayKey"/"mbWayKey" e
+    # "EstadoPedidosJson"/"EstadoPedidosJSON" — ver docs/providers/ifthenpay-mbway.md).
+    payment_id = str(data.get("IdPedido") or data.get("idPedido") or "")
     if not payment_id:
         raise GatewayRejected(call.http_status, data, call=call)
 

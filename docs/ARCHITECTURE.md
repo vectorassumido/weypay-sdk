@@ -13,7 +13,7 @@ src/weypay/
 ├── http.py          transporte: timeout, retry, correlação, redação na fronteira
 ├── redaction.py      redact(payload, secret_keys) -> dict
 └── providers/
-    ├── ifthenpay/    mbway.py · pinpay.py · callback.py
+    ├── ifthenpay/    mbway.py · pinpay.py · callback.py · reference.py
     ├── eupago/       mbway.py · split.py · pix.py · status.py · callbacks.py
     └── sibs/         spg/ · marketplace/
 ```
@@ -21,6 +21,12 @@ src/weypay/
 `providers/<x>/` nunca importa `providers/<y>/` — fronteira testada em
 `tests/test_isolation.py`. É o que torna trivial extrair um gateway para um pacote próprio
 mais tarde, se algum dia se justificar.
+
+`providers/ifthenpay/reference.py` (v0.5.0): `SYSTEM_PREFIXES` (`71` bookwey, `72` p8a, `73`
+boxwey) + `new_reference(system)`/`has_prefix(reference, system)`. Cada sistema tem a sua
+própria conta ifthenpay (sem chaves partilhadas — ver `docs/SECURITY.md` regra 5), por isso o
+prefixo é só uma defesa adicional de baixo custo, não um mecanismo de pertença — ver
+`docs/providers/ifthenpay-callbacks.md` (i).
 
 ## `money.py`
 
